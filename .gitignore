@@ -1,0 +1,9 @@
+*.out
+*.pyc
+*.pth
+*.tar
+*.mat
+train_univ.sh
+transfer.sh
+train_ind.sh
+data/
