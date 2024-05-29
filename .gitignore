@@ -2,7 +2,5 @@
 *.pyc
 *.tar
 *.mat
-train_univ.sh
-transfer.sh
-train_ind.sh
+*.sh
 data/
