@@ -45,6 +45,7 @@ for name, param in model.named_parameters():
 #loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 cardiac_dataset = anatomy_data('data/cardiac/cardiac_singlecoil_train.mat', acc=5)
+print("number of samples in cardiac dataset: ", len(cardiac_dataset))
 cardiac_loader = DataLoader(cardiac_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)

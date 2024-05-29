@@ -241,7 +241,69 @@ class LDA(nn.Module):
             x_list.append(x)
             
         return x_list
+
+class LDA_vis(nn.Module):
+    def __init__(self, **kwargs):
+        super(LDA_vis, self).__init__()
+        cur_iter = kwargs['n_block']
+        
+        self.thresh = nn.Parameter(torch.Tensor([0.002]), requires_grad=True)
+        self.thresh_s = nn.Parameter(torch.Tensor([0.001]), requires_grad=True)
+        
+        self.cur_iter = cur_iter
+        
+        self.alphas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
+        self.betas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
+        
+        channel_num =16
+        self.channel_num = channel_num
+        
+        self.ImgNet = Complex_Learnable_Block(
+            n_feats=channel_num,
+            n_convs=4,
+            k_size=3,
+            padding=1,
+        )
+        
+    def set_PhaseNo(self, cur_iter):
+        self.cur_iter = cur_iter
+        
+    def phase(self, x, k, phase, gamma, mask):
+        '''
+            computation for each phase
+        '''
+        alpha = torch.abs(self.alphas[phase])
+        beta = torch.abs(self.betas[phase])
+        
+        # update x
+        #Ax = projection.apply(x, self.options)
+        Fx = torch.fft.fft2(x, norm="ortho")
+        # Fx = data_consistency(Fx, k, mask)
+        residual = Fx - k
+        # residual_S_new = Ax - z
+        # grad_fx = projection_t.apply(residual_S_new, self.options)
+        grad = torch.fft.ifft2(residual, norm="ortho")
+
+        #c = x - alpha * grad_fx
+        c = x - alpha * grad
+        cache_x = self.ImgNet(c)
+        u = c - beta * self.ImgNet.gradient(cache_x, gamma)
+        
+        Fu = torch.fft.fft2(u, norm="ortho")
+        Fu = data_consistency(Fu, k, mask)
+        u = torch.fft.ifft2(Fu, norm="ortho")
+        
+        return u, cache_x
     
+    def forward(self, x, k, mask):
+        x_list = []
+        g_list = []
+        for phase in range(self.cur_iter):
+            x, g = self.phase(x, k, phase, 0.9**phase, mask)
+            x_list.append(x)
+            g_list.append(g)
+            
+        return x_list, g_list
 
 class Domain_Transform(torch.nn.Module):
     def __init__(self, **kwargs):
@@ -398,3 +460,140 @@ class Universal_LDA(nn.Module):
             x_list.append(x)
             
         return x_list
+    
+    
+class Universal_LDA_vis(nn.Module):
+    def __init__(self, **kwargs):
+        super(Universal_LDA_vis, self).__init__()
+        anatomies = kwargs['anatomies']
+        
+        channel_num = 16
+        self.h_dict = nn.ModuleDict(
+            {
+                anatomy: 
+                Domain_Transform(
+                    n_feats=channel_num,
+                    k_size=3,
+                    padding=1,
+                    ) for anatomy in anatomies
+            }
+        )
+        
+        cur_iter = kwargs['n_block']
+        
+        # self.thresh = nn.Parameter(torch.Tensor([0.002]), requires_grad=True)
+        self.soft_thr = nn.ParameterDict({
+                            anatomy: nn.Parameter(torch.Tensor([0.002]), requires_grad=True) for anatomy in anatomies
+                        })
+        
+        self.cur_iter = cur_iter
+        
+        # self.alphas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
+        # self.betas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
+        
+        self.alphas = nn.ParameterDict({
+                            anatomy: nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True) for anatomy in anatomies
+                        })
+        self.betas = nn.ParameterDict({
+                            anatomy: nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True) for anatomy in anatomies
+                        })
+        
+        # complex learnable blocks are still the same
+        # except the gradient part
+        # customize gradient function under universal LDA
+        self.ImgNet = Complex_Learnable_Block(
+            n_feats=channel_num,
+            n_convs=4,
+            k_size=3,
+            padding=1,
+        )
+    
+    def set_PhaseNo(self, cur_iter):
+        self.cur_iter = cur_iter
+    
+    def gradient(self, forward_cache, gamma, anatomy):
+        soft_thr = torch.abs(self.soft_thr[anatomy]) * gamma
+        hg = forward_cache.pop()
+        
+        # compute gradient of smoothed regularization
+        norm_hg = torch.norm(hg, dim = 1, keepdim=True)
+        denominator = torch.where(norm_hg > soft_thr, norm_hg, soft_thr)
+        out = torch.div(hg, denominator)
+        out_real, out_imag = out.real, out.imag
+        out_real_next = self.h_dict[anatomy].RconvT(out_real) - self.h_dict[anatomy].IconvT(out_imag)
+        out_img_next = self.h_dict[anatomy].IconvT(out_real) + self.h_dict[anatomy].RconvT(out_imag)
+        out = out_real_next + 1j * out_img_next
+        
+        #out_real_next = F.conv_transpose2d(out_real, self.h_dict[anatomy][phase].Rconv.weight, padding=self.ImgNet.padding) - \
+        #                F.conv_transpose2d(out_imag, self.h_dict[anatomy][phase].Iconv.weight, padding=self.ImgNet.padding)
+        #out_img_next = F.conv_transpose2d(out_real, self.h_dict[anatomy][phase].Iconv.weight, padding=self.ImgNet.padding) + \
+        #                F.conv_transpose2d(out_imag, self.h_dict[anatomy][phase].Rconv.weight, padding=self.ImgNet.padding)
+        #out = out_real_next + 1j * out_img_next
+        
+        for i in range(len(forward_cache)-1, 0, -1):
+            out_real, out_imag = out.real, out.imag
+            # tmp = self.act_der(forward_cache[i].clone().real) + 1.j * self.act_der(forward_cache[i].clone().imag)
+            tmp_real, tmp_imag = self.ImgNet.act_der(forward_cache[i-1].clone().real), self.ImgNet.act_der(forward_cache[i-1].clone().imag)
+            #out_real_next = F.conv_transpose2d(out_real, self.ImgNet.Rconvs[i].weight, padding=self.ImgNet.padding) - \
+            #                F.conv_transpose2d(out_imag, self.ImgNet.Iconvs[i].weight, padding=self.ImgNet.padding)
+            #out_img_next = F.conv_transpose2d(out_real, self.ImgNet.Iconvs[i].weight, padding=self.ImgNet.padding) + \
+            #                F.conv_transpose2d(out_imag, self.ImgNet.Rconvs[i].weight, padding=self.ImgNet.padding)
+            out_real_next = self.ImgNet.RconvsT[i](out_real) - self.ImgNet.IconvsT[i](out_imag)
+            out_img_next = self.ImgNet.IconvsT[i](out_real) + self.ImgNet.RconvsT[i](out_imag)
+            out = out_real_next * tmp_real - out_img_next * tmp_imag + 1j * (out_real_next * tmp_imag + out_img_next * tmp_real)
+        
+        out_real, out_imag = out.real, out.imag
+        #out_real_next = F.conv_transpose2d(out_real, self.ImgNet.Rconvs[0].weight, padding=self.ImgNet.padding) - \
+        #                F.conv_transpose2d(out_imag, self.ImgNet.Iconvs[0].weight, padding=self.ImgNet.padding)
+        #out_img_next = F.conv_transpose2d(out_real, self.ImgNet.Iconvs[0].weight, padding=self.ImgNet.padding) + \
+        #                F.conv_transpose2d(out_imag, self.ImgNet.Rconvs[0].weight, padding=self.ImgNet.padding)
+        out_real_next = self.ImgNet.RconvsT[0](out_real) - self.ImgNet.IconvsT[0](out_imag)
+        out_img_next = self.ImgNet.IconvsT[0](out_real) + self.ImgNet.RconvsT[0](out_imag)
+        out = out_real_next + 1j * out_img_next
+        
+        return out
+        
+    
+    def phase(self,x, k, phase, gamma, mask, anatomy):
+        '''
+            computation for each phase
+        '''
+        alpha = torch.abs(self.alphas[anatomy][phase])
+        beta = torch.abs(self.betas[anatomy][phase])
+        
+        # update x
+        #Ax = projection.apply(x, self.options)
+        Fx = torch.fft.fft2(x, norm="ortho")
+        # Fx = data_consistency(Fx, k, mask)
+        residual = Fx - k
+        # residual_S_new = Ax - z
+        # grad_fx = projection_t.apply(residual_S_new, self.options)
+        grad = torch.fft.ifft2(residual, norm="ortho")
+
+        #c = x - alpha * grad_fx
+        c = x - alpha * grad
+        cache_univ = self.ImgNet(c)
+        # g = cache_univ.pop()
+        
+        # pass to domain transform
+        hg = self.h_dict[anatomy](cache_univ[-1])
+        cache_univ.append(hg)
+        
+        # calculate gradient
+        u = c - beta * self.gradient(cache_univ, gamma, anatomy)
+        
+        Fu = torch.fft.fft2(u, norm="ortho")
+        Fu = data_consistency(Fu, k, mask)
+        u = torch.fft.ifft2(Fu, norm="ortho")
+        
+        return u, cache_univ, hg
+    
+    def forward(self, x, k, mask, anatomy):
+        x_list = []
+        g_list = []
+        for phase in range(self.cur_iter):
+            x, g, hg = self.phase(x, k, phase, 0.9**phase, mask, anatomy)
+            x_list.append(x)
+            g_list.append(g)
+            
+        return x_list, g_list, hg

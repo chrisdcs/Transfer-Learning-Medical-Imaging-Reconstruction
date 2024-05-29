@@ -6,13 +6,14 @@ import utils.compressed_sensing as cs
 
 
 class anatomy_data(Dataset):
-    def __init__(self, file, acc):
+    def __init__(self, file, acc, n):
         # acc: acceleration rate
         self.data = scio.loadmat(file)
         self.acc = acc
+        self.n = n
 
     def __len__(self):
-        return min(20,len(self.data['images']))
+        return min(self.n,len(self.data['images']))
 
     def __getitem__(self, idx):
         # return undersampled image, k-space, mask, original image, original k-space

@@ -21,18 +21,19 @@ n_phase = 15
 n_epoch = 50
 
 init_seeds()
+anatomy = 'cardiac'
 model = LDA(n_block=n_phase)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 batch_size = 2
 model.to(device)
 
-cardiac_dataset = anatomy_data('data/cardiac/cardiac_singlecoil_train.mat', acc=5)
-cardiac_loader = DataLoader(cardiac_dataset, batch_size=batch_size, shuffle=True)
+anatomy_dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=5, n=400)
+anatomy_loader = DataLoader(anatomy_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.7)
-save_dir = "universal_LDA/cardiac/checkpoints"
+save_dir = f"universal_LDA/{anatomy}/checkpoints"
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -43,7 +44,7 @@ for PhaseNo in range(3, n_phase+1, 2):
     loss_list = []
     
     for epoch_i in range(1, n_epoch+1):
-        for i, data in enumerate(cardiac_loader):
+        for i, data in enumerate(anatomy_loader):
             # undersampled image, k-space, mask, original image, original k-space
             im_und, k_und, mask, img_gnd, k_gnd = data
             # print(im_und.shape, k_und.shape, mask.shape, img_gnd.shape, k_gnd.shape)
