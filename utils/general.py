@@ -9,7 +9,19 @@ def init_seeds(seed=0, deterministic=False):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)  # for Multi-GPU, exception safe
+
+def NCC(x,y):
+    x = x.clone().flatten(-2)
+    y = y.clone().flatten(-2)
     
+    x_hat = x - torch.mean(x, dim=-1, keepdim=True)
+    y_hat = y - torch.mean(y, dim=-1, keepdim=True)
+    
+    numerator = x_hat * y_hat
+    denominator = torch.sqrt(x.std(-1, keepdim=True).sum(-1, keepdim=True)) * torch.sqrt(y.std(-1, keepdim=True).sum(-1, keepdim=True))
+    
+    return torch.mean(numerator / denominator)
+
 def normalized_cross_correlation(x, y, return_map, reduction='mean', eps=1e-8):
     """ N-dimensional normalized cross correlation (NCC)
 
