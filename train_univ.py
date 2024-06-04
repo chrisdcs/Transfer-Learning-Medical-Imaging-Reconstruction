@@ -35,8 +35,8 @@ loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 #brain_dataset = anatomy_data('data/brain/brain_singlecoil_train.mat', acc=5)
 #brain_loader = DataLoader(brain_dataset, batch_size=batch_size, shuffle=True)
 
-optim = torch.optim.Adam(model.parameters(), lr=1e-5)
-scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.6)
+optim = torch.optim.Adam(model.parameters(), lr=1e-4)
+scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
 save_dir = "universal_LDA/universal/checkpoints"
 
 start_epoch = 1
@@ -73,7 +73,7 @@ for PhaseNo in range(start_phase, n_phase+1, 2):
             k_und = k_und.to(device)
             mask = mask.to(device)
             img_gnd = img_gnd.to(device)
-            k_gnd = k_gnd.to(device)    
+            k_gnd = k_gnd.to(device)
             
             # forward pass
             optim.zero_grad()

@@ -10,7 +10,7 @@ import os
 import torch.nn.functional as F
 
 from utils.dataset import universal_data
-from utils.general import init_seeds, normalized_cross_correlation
+from utils.general import init_seeds, normalized_cross_correlation, NCC
 from torch.utils.data import DataLoader
 from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
@@ -44,8 +44,8 @@ loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 #brain_dataset = anatomy_data('data/brain/brain_singlecoil_train.mat', acc=5)
 #brain_loader = DataLoader(brain_dataset, batch_size=batch_size, shuffle=True)
 
-optim = torch.optim.Adam(model.parameters(), lr=1e-5)
-scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.6)
+optim = torch.optim.Adam(model.parameters(), lr=1e-4)
+scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
 save_dir = "universal_LDA/universal_KT/checkpoints"
 
 start_epoch = 1
@@ -59,6 +59,8 @@ if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
     start_epoch = checkpoint['epoch']
     start_phase = checkpoint['phase']
     
+    scheduler.step()
+    scheduler.step()
     scheduler.step()
     print('Model loaded from checkpoint')
 
@@ -87,13 +89,16 @@ for PhaseNo in range(start_phase, n_phase+1, 2):
             output, g, _ = model(im_und, k_und, mask, anatomy[0])
             output = torch.abs(output[-1]).clamp(0, 1)
             img_gnd = torch.abs(img_gnd)
-            with torch.no_grad():
-                if anatomy[0] == 'brain':
-                    _, g_i = anatomy_model_1(im_und, k_und, mask)
-                else:
-                    _, g_i = anatomy_model_2(im_und, k_und, mask)
-            
-            loss = torch.sum(torch.square(output - img_gnd)) + torch.abs(normalized_cross_correlation(g[-1][-1], g_i[-1][-1], False))#F.mse_loss(x_output.real, img_gnd.real) + F.mse_loss(x_output.imag, img_gnd.imag)
+            if PhaseNo <= 7:
+                with torch.no_grad():
+                    if anatomy[0] == 'brain':
+                        _, g_i = anatomy_model_1(im_und, k_und, mask)
+                    else:
+                        _, g_i = anatomy_model_2(im_und, k_und, mask)
+                KT_loss = 1-normalized_cross_correlation(torch.abs(g[-1][-1]), torch.abs(g_i[PhaseNo-1][-1]),False)
+            else:
+                KT_loss = torch.tensor(0)
+            loss = torch.sum(torch.square(output - img_gnd)) + KT_loss# * 0.7 ** (PhaseNo-3)
             loss.backward()
             optim.step()
             
@@ -102,7 +107,7 @@ for PhaseNo in range(start_phase, n_phase+1, 2):
             for j in range(batch_size):
                 PSNR_list.append(psnr(np.abs(output[j].squeeze().cpu().detach().numpy()), img_gnd[j].squeeze().cpu().detach().numpy(), data_range=1))
             if (i+1) % 100 == 0:
-                print(i+1, loss.item())
+                print(i+1, loss.item(), KT_loss.item())
         avg_l = np.mean(loss_list)
         avg_p = np.mean(PSNR_list)
         epoch_data = '[Phase %02d] [Epoch %02d/%02d] Avg Loss: %.4f \t Avg PSNR: %.4f\n\n' % \
