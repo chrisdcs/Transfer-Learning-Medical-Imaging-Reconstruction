@@ -3,4 +3,5 @@
 *.tar
 *.mat
 *.sh
+*.pth
 data/
