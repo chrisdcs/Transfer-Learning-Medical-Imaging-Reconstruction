@@ -591,9 +591,11 @@ class Universal_LDA_vis(nn.Module):
     def forward(self, x, k, mask, anatomy):
         x_list = []
         g_list = []
+        hg_list = []
         for phase in range(self.cur_iter):
             x, g, hg = self.phase(x, k, phase, 0.9**phase, mask, anatomy)
             x_list.append(x)
             g_list.append(g)
+            hg_list.append(hg)
             
-        return x_list, g_list, hg
+        return x_list, g_list, hg_list
