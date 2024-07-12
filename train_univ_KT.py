@@ -10,7 +10,7 @@ import os
 import torch.nn.functional as F
 
 from utils.dataset import universal_data
-from utils.general import init_seeds, normalized_cross_correlation, NCC
+from utils.general import init_seeds, normalized_cross_correlation
 from torch.utils.data import DataLoader
 from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
@@ -59,9 +59,9 @@ if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
     start_epoch = checkpoint['epoch']
     start_phase = checkpoint['phase']
     
-    scheduler.step()
-    scheduler.step()
-    scheduler.step()
+    #scheduler.step()
+    #scheduler.step()
+    #scheduler.step()
     print('Model loaded from checkpoint')
 
 if not os.path.exists(save_dir):
