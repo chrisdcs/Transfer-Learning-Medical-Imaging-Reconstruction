@@ -43,6 +43,47 @@ def var_dens_mask(shape, ivar, sample_high_freq=True):
     return mask
 
 
+def radial_mask(shape, acc, sample_n=10, centred=False):
+    """
+    Create a radial sampling mask for MRI.
+
+    shape: tuple - of form (..., nx, ny)
+    acc: float - doesn't have to be integer 4, 8, etc.
+    sample_n: int - number of central lines to sample fully
+    centred: bool - if True, mask will be centred
+
+    Returns:
+    mask: ndarray - sampling mask of same shape as input
+    """
+    N, Nx, Ny = int(np.prod(shape[:-2])), shape[-2], shape[-1]
+    num_radial_lines = int(Nx / acc)
+    
+    # Initialize the mask
+    mask = np.zeros((N, Nx, Ny), dtype=np.float32)
+    
+    # Calculate the coordinates for the radial lines
+    x_center, y_center = Nx // 2, Ny // 2
+    radius = np.sqrt(x_center**2 + y_center**2)
+    
+    for i in range(N):
+        for theta in np.linspace(0, np.pi, num_radial_lines, endpoint=False):
+            for r in np.linspace(-radius, radius, max(Nx, Ny)):
+                x = int(x_center + r * np.cos(theta))
+                y = int(y_center + r * np.sin(theta))
+                
+                if 0 <= x < Nx and 0 <= y < Ny:
+                    mask[i, x, y] = 1
+    
+    # Ensure central lines are fully sampled if specified
+    if sample_n:
+        mask[:, Nx//2-sample_n//2:Nx//2+sample_n//2, :] = 1
+    
+    # If not centred, apply ifftshift
+    if not centred:
+        mask = mymath.ifftshift(mask, axes=(-1, -2))
+    
+    return mask
+
 def cartesian_mask(shape, acc, sample_n=10, centred=False):
     """
     Sampling density estimated from implementation of kt FOCUSS
