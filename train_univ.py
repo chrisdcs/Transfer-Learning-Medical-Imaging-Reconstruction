@@ -23,7 +23,7 @@ n_epoch = 50
 init_seeds()
 anatomies = ['brain', 'knee']
 
-model = Universal_LDA(n_block=n_phase, anatomies=anatomies)
+model = Universal_LDA(n_block=n_phase, anatomies=anatomies, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 batch_size = 1

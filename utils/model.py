@@ -194,7 +194,7 @@ class LDA(nn.Module):
         self.alphas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
         self.betas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
         
-        channel_num =16
+        channel_num = kwargs['channel_num']
         self.channel_num = channel_num
         
         self.ImgNet = Complex_Learnable_Block(
@@ -331,8 +331,8 @@ class Universal_LDA(nn.Module):
     def __init__(self, **kwargs):
         super(Universal_LDA, self).__init__()
         anatomies = kwargs['anatomies']
-        
-        channel_num = 16
+        channel_num = kwargs['channel_num']
+        # channel_num = 32
         self.h_dict = nn.ModuleDict(
             {
                 anatomy: 
