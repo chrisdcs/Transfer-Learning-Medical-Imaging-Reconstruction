@@ -242,6 +242,43 @@ class LDA(nn.Module):
             
         return x_list
 
+
+class ComplexConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size):
+        super(ComplexConv2d, self).__init__()
+        self.real_conv = nn.Conv2d(in_channels, out_channels, kernel_size)
+        self.imag_conv = nn.Conv2d(in_channels, out_channels, kernel_size)
+
+    def forward(self, x):
+        real_part = self.real_conv(x.real) - self.imag_conv(x.imag)
+        imag_part = self.real_conv(x.imag) + self.imag_conv(x.real)
+        return torch.complex(real_part, imag_part)
+
+class Init_CNN(nn.Module):
+    def __init__(self):
+        super(Init_CNN, self).__init__()
+        self.conv1 = ComplexConv2d(1, 16, 3)
+        self.conv2 = ComplexConv2d(16, 16, 3)
+        self.conv3 = ComplexConv2d(16, 16, 3)
+        self.conv4 = ComplexConv2d(16, 1, 3)
+        
+    def forward(self, x):
+        x = self.conv1(x)
+        x = torch.complex(F.relu(x.real), F.relu(x.imag))
+        x = self.conv2(x)
+        x = torch.complex(F.relu(x.real), F.relu(x.imag))
+        x = self.conv3(x)
+        x = torch.complex(F.relu(x.real), F.relu(x.imag))
+        x = self.conv4(x)
+        return x
+        
+def complex_mse_loss(input, target):
+    # Assuming input and target are complex tensors with real and imaginary parts
+    real_diff = input.real - target.real
+    imag_diff = input.imag - target.imag
+    mse_loss = torch.mean(0.5 * (real_diff**2 + imag_diff**2))
+    return mse_loss
+
 class LDA_vis(nn.Module):
     def __init__(self, **kwargs):
         super(LDA_vis, self).__init__()
