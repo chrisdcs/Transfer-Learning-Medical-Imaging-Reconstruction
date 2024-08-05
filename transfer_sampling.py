@@ -18,10 +18,10 @@ from skimage.metrics import structural_similarity as ssim
 from utils.model import Universal_LDA
 
 n_phase = 15
-n_epoch = 50
+n_epoch = 100
 
 init_seeds()
-sampling_rates = ['8', '10', '10_b']
+sampling_rates = ['15', '4', '8', '10', '12']
 
 model = Universal_LDA(n_block=n_phase, anatomies=sampling_rates, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -29,7 +29,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 2
 model.to(device)
 
-model.load_state_dict(torch.load('universal_LDA/universal/checkpoints_sampling_8_10/checkpoint.pth')['state_dict'],
+model.load_state_dict(torch.load('universal_LDA/universal/checkpoints_sampling_4_8_12_15/checkpoint.pth')['state_dict'],
                       strict=False)
 
 # freeze the weights of the pretrained anatomy-specific layers
@@ -44,13 +44,13 @@ for name, param in model.named_parameters():
 #dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], acc=5)
 #loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-dataset = anatomy_data('data/brain/brain_singlecoil_train.mat', acc=10, n=100)
+dataset = anatomy_data('data/brain/brain_singlecoil_train.mat', acc=10, n=400)
 print("number of samples in 10% sampling dataset: ", len(dataset))
 loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
-save_dir = "universal_LDA/brain_sampling/checkpoints_universal_same_sampling"
+save_dir = "universal_LDA/brain_sampling/checkpoints_universal_481215"
 
 start_phase = 3
 start_epoch = 1
@@ -71,7 +71,7 @@ if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
-anatomy = ['10_b']
+anatomy = ['10']
 # n_phase = 9
 for PhaseNo in range(start_phase, n_phase+1, 2):
     model.set_PhaseNo(PhaseNo)
