@@ -246,8 +246,8 @@ class LDA(nn.Module):
 class ComplexConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size):
         super(ComplexConv2d, self).__init__()
-        self.real_conv = nn.Conv2d(in_channels, out_channels, kernel_size)
-        self.imag_conv = nn.Conv2d(in_channels, out_channels, kernel_size)
+        self.real_conv = nn.Conv2d(in_channels, out_channels, kernel_size, padding=kernel_size//2)
+        self.imag_conv = nn.Conv2d(in_channels, out_channels, kernel_size, padding=kernel_size//2)
 
     def forward(self, x):
         real_part = self.real_conv(x.real) - self.imag_conv(x.imag)
