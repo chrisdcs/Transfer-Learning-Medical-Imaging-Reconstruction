@@ -6,11 +6,12 @@ import utils.compressed_sensing as cs
 
 
 class anatomy_data(Dataset):
-    def __init__(self, file, acc, n):
+    def __init__(self, file, acc, n, mask=None):
         # acc: acceleration rate
         self.data = scio.loadmat(file)
         self.acc = acc
         self.n = n
+        self.mask = mask
 
     def __len__(self):
         return min(self.n,len(self.data['images']))
@@ -20,7 +21,10 @@ class anatomy_data(Dataset):
         image = self.data['images'][idx][None,:,:]
         k_space = self.data['k_space'][idx][None,:,:]
         
-        mask = cs.cartesian_mask(image.shape, acc=self.acc, centred=True)
+        if not self.mask or self.mask == 'cartesian':
+            mask = cs.cartesian_mask(image.shape, acc=self.acc, centred=True)
+        elif self.mask == 'radial':
+            mask = cs.radial_mask(image.shape, acc=self.acc, centred=True)
         im_und, k_und = cs.undersample(image, mask, centred=True)
         
         return im_und.astype(np.complex64), k_und.astype(np.complex64), mask.astype(np.float32), image.astype(np.complex64), k_space.astype(np.complex64)
