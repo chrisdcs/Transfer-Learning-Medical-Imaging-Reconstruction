@@ -29,16 +29,39 @@ class anatomy_data(Dataset):
         
         return im_und.astype(np.complex64), k_und.astype(np.complex64), mask.astype(np.float32), image.astype(np.complex64), k_space.astype(np.complex64)
     
+class init_data(Dataset):
+    def __init__(self, file, n):
+        # acc: acceleration rate
+        self.data = scio.loadmat(file)
+        self.n = n
+    
+    def __len__(self):
+        return min(self.n,len(self.data['images']))
+    
+    def __getitem__(self, idx):
+        # return undersampled image, k-space, mask, original image, original k-space
+        image = self.data['images'][idx][None,:,:]
+        k_space = self.data['k_space'][idx][None,:,:]
+        mask = self.data['masks'][idx][None,:,:]
+        init = self.data['inits'][idx][None,:,:]
+        
+        #init_img = np.fft.ifft2(k_space, norm='ortho')
+        #init_img = np.abs(init_img)
+        #init_img = (init_img - np.min(init_img)) / (np.max(init_img) - np.min(init_img))
+        
+        return init.astype(np.float32), image.astype(np.complex64), k_space.astype(np.complex64), mask.astype(np.float32)
     
     
 class universal_data(Dataset):
-    def __init__(self, files, acc):
+    def __init__(self, files, acc, mask=None):
         # acc: acceleration rate
         self.universal_image = []
         self.universal_k_space = []
         
         self.anatomy_names = []
         self.n_anatomy = len(files)
+        
+        self.mask = mask
         
         anatomies = []
         for file in files:
@@ -60,7 +83,10 @@ class universal_data(Dataset):
         image = self.universal_image[idx][None,:,:]
         k_space = self.universal_k_space[idx][None,:,:]
         
-        mask = cs.cartesian_mask(image.shape, acc=self.acc, centred=True)
+        if self.mask == 'radial':
+            mask = cs.radial_mask(image.shape, acc=self.acc, centred=True)
+        else:
+            mask = cs.cartesian_mask(image.shape, acc=self.acc, centred=True)
         im_und, k_und = cs.undersample(image, mask, centred=True)
         
         return im_und.astype(np.complex64), k_und.astype(np.complex64), mask.astype(np.float32), image.astype(np.complex64), k_space.astype(np.complex64), self.anatomy_names[idx % self.n_anatomy]

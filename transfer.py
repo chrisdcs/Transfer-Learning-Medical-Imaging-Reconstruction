@@ -19,17 +19,18 @@ from utils.model import Universal_LDA
 
 n_phase = 15
 n_epoch = 50
-
+mask = 'radial'
+acc = 10
 init_seeds()
 anatomies = ['brain', 'knee', 'cardiac']
 
-model = Universal_LDA(n_block=n_phase, anatomies=anatomies)
+model = Universal_LDA(n_block=n_phase, anatomies=anatomies, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 batch_size = 2
 model.to(device)
 
-model.load_state_dict(torch.load('universal_LDA/universal/checkpoints/checkpoint.pth')['state_dict'],
+model.load_state_dict(torch.load(f'universal_LDA/universal/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'],
                       strict=False)
 
 # freeze the weights of the pretrained anatomy-specific layers
@@ -44,13 +45,13 @@ for name, param in model.named_parameters():
 #dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], acc=5)
 #loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-cardiac_dataset = anatomy_data('data/cardiac/cardiac_singlecoil_train.mat', acc=5, n=10)
+cardiac_dataset = anatomy_data('data/cardiac/cardiac_singlecoil_train.mat', acc=10, n=40, mask=mask)
 print("number of samples in cardiac dataset: ", len(cardiac_dataset))
 cardiac_loader = DataLoader(cardiac_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
-save_dir = "universal_LDA/cardiac/checkpoints_universal_15"
+save_dir = f"universal_LDA/cardiac/checkpoints_transfer_{acc}_sampling_{mask}"
 
 start_phase = 3
 start_epoch = 1

@@ -262,7 +262,8 @@ class Init_CNN(nn.Module):
         self.conv3 = ComplexConv2d(16, 16, 3)
         self.conv4 = ComplexConv2d(16, 1, 3)
         
-    def forward(self, x):
+    def forward(self, x, mask):
+        x_inp = x.clone()
         x = self.conv1(x)
         x = torch.complex(F.relu(x.real), F.relu(x.imag))
         x = self.conv2(x)
@@ -270,6 +271,9 @@ class Init_CNN(nn.Module):
         x = self.conv3(x)
         x = torch.complex(F.relu(x.real), F.relu(x.imag))
         x = self.conv4(x)
+        
+        x = data_consistency(x, x_inp, mask)
+        
         return x
         
 def complex_mse_loss(input, target):
