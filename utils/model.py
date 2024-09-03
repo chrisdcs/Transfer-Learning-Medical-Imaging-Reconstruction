@@ -207,7 +207,7 @@ class LDA(nn.Module):
     def set_PhaseNo(self, cur_iter):
         self.cur_iter = cur_iter
         
-    def phase(self, x, k, phase, gamma, mask):
+    def phase(self, x, k, phase, gamma, mask, return_g=False):
         '''
             computation for each phase
         '''
@@ -232,14 +232,23 @@ class LDA(nn.Module):
         Fu = data_consistency(Fu, k, mask)
         u = torch.fft.ifft2(Fu, norm="ortho")
         
+        if return_g:
+            return u, cache_x[-1]
         return u
     
-    def forward(self, x, k, mask):
+    def forward(self, x, k, mask, return_g=None):
         x_list = []
+        g_list = []
         for phase in range(self.cur_iter):
-            x = self.phase(x, k, phase, 0.9**phase, mask)
+            if return_g:
+                x, g = self.phase(x, k, phase, 0.9**phase, mask, return_g)
+                g_list.append(g)
+            else:
+                x = self.phase(x, k, phase, 0.9**phase, mask)
             x_list.append(x)
             
+        if return_g:
+            return x_list, g_list
         return x_list
 
 
@@ -460,7 +469,7 @@ class Universal_LDA(nn.Module):
         return out
         
     
-    def phase(self,x, k, phase, gamma, mask, anatomy):
+    def phase(self,x, k, phase, gamma, mask, anatomy, return_g=False):
         '''
             computation for each phase
         '''
@@ -492,14 +501,22 @@ class Universal_LDA(nn.Module):
         Fu = data_consistency(Fu, k, mask)
         u = torch.fft.ifft2(Fu, norm="ortho")
         
+        if return_g:
+            return u, hg
         return u
     
-    def forward(self, x, k, mask, anatomy):
+    def forward(self, x, k, mask, anatomy, return_g=None):
         x_list = []
+        g_list = []
         for phase in range(self.cur_iter):
-            x = self.phase(x, k, phase, 0.9**phase, mask, anatomy)
+            if return_g:
+                x, hg = self.phase(x, k, phase, 0.9**phase, mask, anatomy, return_g)
+                g_list.append(hg)
+            else:
+                x = self.phase(x, k, phase, 0.9**phase, mask, anatomy)
             x_list.append(x)
-            
+        if return_g:
+            return x_list, g_list
         return x_list
     
     
