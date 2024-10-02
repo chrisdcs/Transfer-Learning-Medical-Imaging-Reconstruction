@@ -97,7 +97,7 @@ class Complex_Mamba_Block(torch.nn.Module):
         
         for i in range(len(forward_cache)-1, 0, -1):
             out_real, out_imag = out.real, out.imag
-            tmp_real, tmp_imag = self.act_der(forward_cache[i-1].clone().real), self.act_der(forward_cache[i-1].clone().imag)
+            #tmp_real, tmp_imag = self.act_der(forward_cache[i-1].clone().real), self.act_der(forward_cache[i-1].clone().imag)
             #out_real_next = F.conv_transpose2d(out_real, self.Rconvs[i].weight, padding=self.padding) - F.conv_transpose2d(out_imag, self.Iconvs[i].weight, padding=self.padding)
             #out_img_next = F.conv_transpose2d(out_real, self.Iconvs[i].weight, padding=self.padding) + F.conv_transpose2d(out_imag, self.Rconvs[i].weight, padding=self.padding)
             out_real_next = self.RconvsT[i](out_real) - self.IconvsT[i](out_imag)
