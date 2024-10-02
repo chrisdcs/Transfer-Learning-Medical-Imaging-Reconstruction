@@ -86,6 +86,8 @@ save_dir = f"universal_LDA/universal_init_weights/checkpoints_{acc}_sampling_{ma
 start_epoch = 1
 start_phase = 3
 
+#save_dir = f"universal_LDA/universal_init_weights/checkpoints_{acc}_sampling_{mask}_start_{start_phase}"
+
 if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
     checkpoint = torch.load(os.path.join(save_dir, 'checkpoint.pth'))
     model.load_state_dict(checkpoint['state_dict'])
