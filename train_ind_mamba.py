@@ -43,13 +43,30 @@ else:
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
-
-for PhaseNo in range(3, n_phase+1, 2):
+    
+start_phase = 3
+start_epoch = 1
+if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
+    checkpoint = torch.load(os.path.join(save_dir, 'checkpoint.pth'))
+    model.load_state_dict(checkpoint['state_dict'])
+    optim.load_state_dict(checkpoint['optimizer'])
+    scheduler.load_state_dict(checkpoint['scheduler'])
+    start_epoch = checkpoint['epoch']
+    start_phase = checkpoint['phase']
+    
+    #scheduler.step()
+    #scheduler.step()
+    #scheduler.step()
+    print('Model loaded from checkpoint')
+    
+start_epoch = 1
+start_phase = 13
+for PhaseNo in range(start_phase, n_phase+1, 2):
     model.set_PhaseNo(PhaseNo)
     PSNR_list = []
     loss_list = []
     
-    for epoch_i in range(1, n_epoch+1):
+    for epoch_i in range(start_epoch, n_epoch+1):
         for i, data in enumerate(anatomy_loader):
             # undersampled image, k-space, mask, original image, original k-space
             im_und, k_und, mask, img_gnd, k_gnd = data
@@ -84,5 +101,13 @@ for PhaseNo in range(3, n_phase+1, 2):
         print(epoch_data)
         
         if epoch_i % 10 == 0:
-            torch.save(model.state_dict(), os.path.join(save_dir, f'checkpoint.pth'))
+            checkpoint = {
+                                'phase': PhaseNo,
+                                'epoch': epoch_i, 
+                                'state_dict': model.state_dict(),
+                                'optimizer': optim.state_dict(),
+                                'scheduler': scheduler.state_dict()
+                             }
+            torch.save(checkpoint, os.path.join(save_dir, f'checkpoint.pth'))
+        start_epoch = 1
     scheduler.step()
