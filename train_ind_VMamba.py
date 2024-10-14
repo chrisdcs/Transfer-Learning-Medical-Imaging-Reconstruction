@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
 
-from utils.model1 import Mamba_LDA
+from utils.model1 import VMamba_LDA
 
 n_phase = 15
 n_epoch = 50
@@ -23,10 +23,10 @@ n_epoch = 50
 init_seeds()
 anatomy = 'brain'
 mask = 'radial'
-model = Mamba_LDA(n_block=n_phase, channel_num=16)
+model = VMamba_LDA(n_block=n_phase, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-batch_size = 2
+batch_size = 1
 model.to(device)
 
 acc = 10
@@ -37,9 +37,9 @@ anatomy_loader = DataLoader(anatomy_dataset, batch_size=batch_size, shuffle=True
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.7)
 if not mask:
-    save_dir = f"universal_LDA/{anatomy}/checkpoints_Mamba_{acc}_sampling_cartesian"
+    save_dir = f"universal_LDA/{anatomy}/checkpoints_VMamba_{acc}_sampling_cartesian"
 else:
-    save_dir = f"universal_LDA/{anatomy}/checkpoints_Mamba_{acc}_sampling_{mask}"
+    save_dir = f"universal_LDA/{anatomy}/checkpoints_VMamba_{acc}_sampling_{mask}"
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)

@@ -22,7 +22,7 @@ n_epoch = 50
 
 init_seeds()
 anatomy = 'knee'
-mask = 'radial'
+mask = 'cartesian'
 model = LDA(n_block=n_phase, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

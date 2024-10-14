@@ -45,13 +45,13 @@ for name, param in model.named_parameters():
 #dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], acc=5)
 #loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-cardiac_dataset = anatomy_data('data/cardiac/cardiac_singlecoil_train.mat', acc=acc, n=20, mask=mask)
+cardiac_dataset = anatomy_data('data/cardiac/cardiac_singlecoil_train.mat', acc=acc, n=10, mask=mask)
 print("number of samples in cardiac dataset: ", len(cardiac_dataset))
 cardiac_loader = DataLoader(cardiac_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
-save_dir = f"universal_LDA/cardiac/checkpoints_transfer_{acc}_sampling_{mask}_data_5_%"
+save_dir = f"universal_LDA/cardiac/checkpoints_transfer_{acc}_sampling_{mask}_data_2.5_%"
 
 start_phase = 3
 start_epoch = 1
