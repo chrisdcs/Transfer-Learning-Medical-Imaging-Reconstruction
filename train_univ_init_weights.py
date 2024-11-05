@@ -22,7 +22,7 @@ n_epoch = 50
 
 init_seeds()
 anatomies = ['brain', 'knee']
-query = 'cardiac'
+query = 'prostate'
 
 model = Universal_LDA(n_block=n_phase, anatomies=anatomies, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -33,8 +33,8 @@ model.to(device)
 # initialize weights for the model
 
 
-mask = 'radial'
-acc = 10
+mask = 'cartesian'
+acc = 5
 dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
                          acc=acc, mask=mask)
 loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -81,10 +81,12 @@ model.h_dict['knee'].IconvT.bias.data = knee_params[f'ImgNet.IconvsT.1.bias']
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
-save_dir = f"universal_LDA/universal_init_weights/checkpoints_{acc}_sampling_{mask}"
+
 
 start_epoch = 1
 start_phase = 3
+
+save_dir = f"universal_LDA/universal_init_weights/checkpoints_{acc}_sampling_{mask}_start_{start_phase}"
 
 #save_dir = f"universal_LDA/universal_init_weights/checkpoints_{acc}_sampling_{mask}_start_{start_phase}"
 

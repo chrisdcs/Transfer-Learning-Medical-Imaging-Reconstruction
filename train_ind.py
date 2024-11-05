@@ -21,7 +21,7 @@ n_phase = 15
 n_epoch = 50
 
 init_seeds()
-anatomy = 'knee'
+anatomy = 'prostate'
 mask = 'cartesian'
 model = LDA(n_block=n_phase, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -29,7 +29,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 2
 model.to(device)
 
-acc = 10
+acc = 5
 
 anatomy_dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=acc, n=400, mask=mask)
 anatomy_loader = DataLoader(anatomy_dataset, batch_size=batch_size, shuffle=True)

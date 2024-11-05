@@ -31,7 +31,7 @@ batch_size = 1
 model.to(device)
 
 mask = 'radial'
-acc = 4
+acc = 5
 dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
                          acc=acc, mask=mask)
 loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)

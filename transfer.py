@@ -19,10 +19,11 @@ from utils.model import Universal_LDA
 
 n_phase = 15
 n_epoch = 100
-mask = 'cartesian'
+mask = 'radial'
 acc = 5
 init_seeds()
-anatomies = ['brain', 'knee', 'cardiac']
+anatomies = ['brain', 'knee', 'prostate']
+anatomy = ['prostate']
 
 model = Universal_LDA(n_block=n_phase, anatomies=anatomies, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -30,7 +31,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 2
 model.to(device)
 
-model.load_state_dict(torch.load(f'universal_LDA/universal/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'],
+model.load_state_dict(torch.load(f'universal_LDA/universal_init_weights/checkpoints_{acc}_sampling_{mask}_start_3/checkpoint.pth')['state_dict'],
                       strict=False)
 
 # freeze the weights of the pretrained anatomy-specific layers
@@ -45,13 +46,13 @@ for name, param in model.named_parameters():
 #dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], acc=5)
 #loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-cardiac_dataset = anatomy_data('data/cardiac/cardiac_singlecoil_train.mat', acc=acc, n=10, mask=mask)
-print("number of samples in cardiac dataset: ", len(cardiac_dataset))
-cardiac_loader = DataLoader(cardiac_dataset, batch_size=batch_size, shuffle=True)
+transfer_dataset = anatomy_data(f'data/{anatomy[0]}/{anatomy[0]}_singlecoil_train.mat', acc=acc, n=400, mask=mask)
+print(f"number of samples in {anatomy[0]} dataset: ", len(transfer_dataset))
+transfer_loader = DataLoader(transfer_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
-save_dir = f"universal_LDA/cardiac/checkpoints_transfer_{acc}_sampling_{mask}_data_2.5_%"
+save_dir = f"universal_LDA/{anatomy[0]}/checkpoints_transfer_{acc}_sampling_{mask}_init_weights_start_3_full"
 
 start_phase = 3
 start_epoch = 1
@@ -72,7 +73,7 @@ if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
-anatomy = ['cardiac']
+#anatomy = ['cardiac']
 # n_phase = 9
 for PhaseNo in range(start_phase, n_phase+1, 2):
     model.set_PhaseNo(PhaseNo)
@@ -80,7 +81,7 @@ for PhaseNo in range(start_phase, n_phase+1, 2):
     loss_list = []
     
     for epoch_i in range(start_epoch, n_epoch+1):
-        for i, data in enumerate(cardiac_loader):
+        for i, data in enumerate(transfer_loader):
             # undersampled image, k-space, mask, original image, original k-space
             im_und, k_und, mask, img_gnd, k_gnd = data
             # print(im_und.shape, k_und.shape, mask.shape, img_gnd.shape, k_gnd.shape)
