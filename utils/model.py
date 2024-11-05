@@ -481,11 +481,15 @@ class Domain_Transform(torch.nn.Module):
         n_feats = kwargs['n_feats']
         padding = kwargs['padding']
         k_size = kwargs['k_size']
-        self.Rconv = nn.Conv2d(n_feats, n_feats, kernel_size=k_size, padding=padding)
-        self.Iconv = nn.Conv2d(n_feats, n_feats, kernel_size=k_size, padding=padding)
+        if 'out_feats' in kwargs:
+            out_feats = kwargs['out_feats']
+        else:
+            out_feats = n_feats
+        self.Rconv = nn.Conv2d(n_feats, out_feats, kernel_size=k_size, padding=padding)
+        self.Iconv = nn.Conv2d(n_feats, out_feats, kernel_size=k_size, padding=padding)
         
-        self.RconvT = nn.ConvTranspose2d(n_feats, n_feats, kernel_size=k_size, padding=padding)
-        self.IconvT = nn.ConvTranspose2d(n_feats, n_feats, kernel_size=k_size, padding=padding)
+        self.RconvT = nn.ConvTranspose2d(out_feats, n_feats, kernel_size=k_size, padding=padding)
+        self.IconvT = nn.ConvTranspose2d(out_feats, n_feats, kernel_size=k_size, padding=padding)
     
     def forward(self, x):
         x_real, x_imag = x.real, x.imag
@@ -501,6 +505,7 @@ class Universal_LDA(nn.Module):
         super(Universal_LDA, self).__init__()
         anatomies = kwargs['anatomies']
         channel_num = kwargs['channel_num']
+        self.channel_num = channel_num
         # channel_num = 32
         self.h_dict = nn.ModuleDict(
             {
@@ -514,13 +519,13 @@ class Universal_LDA(nn.Module):
         )
         
         cur_iter = kwargs['n_block']
+        self.n_block = cur_iter
+        self.cur_iter = cur_iter
         
         # self.thresh = nn.Parameter(torch.Tensor([0.002]), requires_grad=True)
         self.soft_thr = nn.ParameterDict({
                             anatomy: nn.Parameter(torch.Tensor([0.002]), requires_grad=True) for anatomy in anatomies
                         })
-        
-        self.cur_iter = cur_iter
         
         # self.alphas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
         # self.betas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
@@ -544,6 +549,18 @@ class Universal_LDA(nn.Module):
     
     def set_PhaseNo(self, cur_iter):
         self.cur_iter = cur_iter
+        
+    def add_anatomy(self, name, out_feats=16):
+        self.h_dict[name] = Domain_Transform(
+            n_feats=self.channel_num,
+            out_feats = out_feats,
+            k_size=3,
+            padding=1,
+        ).to(next(self.parameters()).device)
+        
+        self.soft_thr[name] = nn.Parameter(torch.Tensor([0.002]), requires_grad=True).to(next(self.parameters()).device)
+        self.alphas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True).to(next(self.parameters()).device)
+        self.betas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True).to(next(self.parameters()).device)
     
     def gradient(self, forward_cache, gamma, anatomy):
         soft_thr = torch.abs(self.soft_thr[anatomy]) * gamma
