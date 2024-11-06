@@ -556,11 +556,11 @@ class Universal_LDA(nn.Module):
             out_feats = out_feats,
             k_size=3,
             padding=1,
-        ).to(next(self.parameters()).device)
+        )#.to(next(self.parameters()).device)
         
-        self.soft_thr[name] = nn.Parameter(torch.Tensor([0.002]), requires_grad=True).to(next(self.parameters()).device)
-        self.alphas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True).to(next(self.parameters()).device)
-        self.betas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True).to(next(self.parameters()).device)
+        self.soft_thr[name] = nn.Parameter(torch.Tensor([0.002]), requires_grad=True)#.to(next(self.parameters()).device)
+        self.alphas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True)#.to(next(self.parameters()).device)
+        self.betas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True)#.to(next(self.parameters()).device)
     
     def gradient(self, forward_cache, gamma, anatomy):
         soft_thr = torch.abs(self.soft_thr[anatomy]) * gamma
