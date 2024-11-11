@@ -68,15 +68,15 @@ class universal_data(Dataset):
             anatomies.append(scio.loadmat(file))
             self.anatomy_names.append(file.split('/')[1])
         
-        for i in range(400):
-            for j in range(self.n_anatomy):
+        for j in range(self.n_anatomy):
+            for i in range(min(400,len(anatomies[j]['images']))):
                 self.universal_image.append(anatomies[j]['images'][i])
                 self.universal_k_space.append(anatomies[j]['k_space'][i])
         
         self.acc = acc
 
     def __len__(self):
-        return 800#len(self.data['images'])
+        return len(self.universal_image)
 
     def __getitem__(self, idx):
         # return undersampled image, k-space, mask, original image, original k-space
