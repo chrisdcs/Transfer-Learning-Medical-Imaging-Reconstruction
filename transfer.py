@@ -22,7 +22,7 @@ n_epoch = 100
 mask = 'radial'
 acc = 5
 init_seeds()
-anatomies = ['brain', 'knee']
+anatomies = ['brain', 'knee']#['brain', 'knee', 'cardiac']
 anatomy = ['prostate']
 
 model = Universal_LDA(n_block=n_phase, anatomies=anatomies, channel_num=16)
@@ -31,7 +31,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 2
 
 
-model.add_anatomy(anatomy[0], 32)
+model.add_anatomy(anatomy[0], 16)
 model.to(device)
 model.load_state_dict(torch.load(f'universal_LDA/universal/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'],
                       strict=False)
@@ -53,8 +53,8 @@ print(f"number of samples in {anatomy[0]} dataset: ", len(transfer_dataset))
 transfer_loader = DataLoader(transfer_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.7)
-save_dir = f"universal_LDA/{anatomy[0]}/checkpoints_transfer_{acc}_sampling_{mask}_32_channels"
+scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
+save_dir = f"universal_LDA/{anatomy[0]}/checkpoints_transfer_{acc}_sampling_{mask}"
 
 start_phase = 3
 start_epoch = 1
