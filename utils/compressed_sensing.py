@@ -43,7 +43,7 @@ def var_dens_mask(shape, ivar, sample_high_freq=True):
     return mask
 
 
-def radial_mask(shape, acc, sample_n=10, centred=False):
+def radial_mask(shape, acc, sample_n=0, centred=False):
     """
     Create a radial sampling mask for MRI.
 
