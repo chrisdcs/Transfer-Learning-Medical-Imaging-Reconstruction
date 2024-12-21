@@ -31,9 +31,9 @@ brain_model = LDA(n_block=n_phase, channel_num=16)
 knee_model = LDA(n_block=n_phase, channel_num=16)
 
 brain_model.load_state_dict(torch.load(
-    f'universal_LDA/brain/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'])
+    f'universal_LDA/brain/checkpoints_{acc}_sampling_{mask}/checkpoint.pth'))
 knee_model.load_state_dict(torch.load(
-    f'universal_LDA/knee/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'])
+    f'universal_LDA/knee/checkpoints_{acc}_sampling_{mask}/checkpoint.pth'))
 brain_model.to(device)
 knee_model.to(device)
 model = Universal_LDA(n_block=n_phase, anatomies=anatomies, channel_num=16)
@@ -99,15 +99,15 @@ for PhaseNo in range(start_phase, n_phase+1, 2):
             img_gnd = torch.abs(img_gnd)
             
             if anatomy[0] == 'brain':
-                feature = brain_model.ImagNet(img_gnd)[-1]
+                feature = brain_model.ImgNet(torch.complex(img_gnd, torch.zeros_like(img_gnd)))[-1]
             elif anatomy[0] == 'knee':
-                feature = knee_model.ImagNet(img_gnd)[-1]
+                feature = knee_model.ImgNet(torch.complex(img_gnd, torch.zeros_like(img_gnd)))[-1]
             
-            g_x_star = model.ImagNet(img_gnd)[-1]
+            g_x_star = model.ImgNet(torch.complex(img_gnd, torch.zeros_like(img_gnd)))[-1]
             
-            MD_loss = torch.sum(torch.square(g_x_star - feature))
+            MD_loss = torch.sum(torch.square(torch.abs(g_x_star - feature)))
             
-            loss = torch.sum(torch.square(output - img_gnd)) + 0.1 * MD_loss
+            loss = torch.sum(torch.square(output - img_gnd)) + 1e-3 * MD_loss
             #F.mse_loss(x_output.real, img_gnd.real) + F.mse_loss(x_output.imag, img_gnd.imag)
             loss.backward()
             optim.step()
