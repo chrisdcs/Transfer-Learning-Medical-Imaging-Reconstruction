@@ -103,9 +103,10 @@ for PhaseNo in range(start_phase, n_phase+1, 2):
             elif anatomy[0] == 'knee':
                 feature = knee_model.ImgNet(torch.complex(img_gnd, torch.zeros_like(img_gnd)))[-1]
             
-            g_x_star = model.ImgNet(torch.complex(img_gnd, torch.zeros_like(img_gnd)))[-1]
+            hg = model.h_dict[anatomy[0]](
+                model.ImgNet(torch.complex(img_gnd, torch.zeros_like(img_gnd)))[-1])
             
-            MD_loss = torch.sum(torch.square(torch.abs(g_x_star - feature)))
+            MD_loss = torch.sum(torch.square(torch.abs(hg - feature)))
             
             loss = torch.sum(torch.square(output - img_gnd)) + 1e-3 * MD_loss
             #F.mse_loss(x_output.real, img_gnd.real) + F.mse_loss(x_output.imag, img_gnd.imag)
