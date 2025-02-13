@@ -17,7 +17,7 @@ from skimage.metrics import structural_similarity as ssim
 
 from utils.model import Universal_LDA
 
-n_phase = 15
+n_phase = 21
 n_epoch = 50
 
 init_seeds()
@@ -30,7 +30,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 1
 model.to(device)
 
-mask = 'radial'
+mask = 'cartesian'
 acc = 5
 dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
                          # 'data/cardiac/cardiac_singlecoil_train.mat'], 
@@ -41,7 +41,7 @@ loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
-save_dir = f"universal_LDA/universal/checkpoints_{acc}_sampling_{mask}"
+save_dir = f"universal_LDA/universal/checkpoints_{acc}_sampling_{mask}_phase_{n_phase}"
 
 start_epoch = 1
 start_phase = 3

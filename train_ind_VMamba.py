@@ -29,13 +29,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 2
 model.to(device)
 
-acc = 10
+acc = 5
 
 anatomy_dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=acc, n=400, mask=mask)
 anatomy_loader = DataLoader(anatomy_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
-scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
+scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.7)
 if not mask:
     save_dir = f"universal_LDA/{anatomy}/checkpoints_VMamba_{acc}_sampling_cartesian"
 else:

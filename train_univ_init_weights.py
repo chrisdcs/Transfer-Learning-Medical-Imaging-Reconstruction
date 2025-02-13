@@ -33,7 +33,7 @@ model.to(device)
 # initialize weights for the model
 
 
-mask = 'cartesian'
+mask = 'radial'
 acc = 5
 dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
                          acc=acc, mask=mask)

@@ -30,10 +30,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 batch_size = 2
 
-
+n_samples = 100
 model.add_anatomy(anatomy[0], 16)
 model.to(device)
-model.load_state_dict(torch.load(f'universal_LDA/universal/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'],
+model.load_state_dict(torch.load(f'universal_LDA/universal_init_weights/checkpoints_{acc}_sampling_{mask}_start_3/checkpoint.pth')['state_dict'],
                       strict=False)
 
 # freeze the weights of the pretrained anatomy-specific layers
@@ -48,13 +48,13 @@ for name, param in model.named_parameters():
 #dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], acc=5)
 #loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-transfer_dataset = anatomy_data(f'data/{anatomy[0]}/{anatomy[0]}_singlecoil_train.mat', acc=acc, n=40, mask=mask)
+transfer_dataset = anatomy_data(f'data/{anatomy[0]}/{anatomy[0]}_singlecoil_train.mat', acc=acc, n=n_samples, mask=mask)
 print(f"number of samples in {anatomy[0]} dataset: ", len(transfer_dataset))
 transfer_loader = DataLoader(transfer_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
-save_dir = f"universal_LDA/{anatomy[0]}/checkpoints_transfer_{acc}_sampling_{mask}"
+save_dir = f"universal_LDA/{anatomy[0]}/checkpoints_transfer_{acc}_sampling_{mask}_samples_{n_samples}_init_3"
 
 start_phase = 3
 start_epoch = 1
