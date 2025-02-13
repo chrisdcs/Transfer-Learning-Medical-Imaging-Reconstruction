@@ -12,7 +12,7 @@ dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/kn
                          acc=acc, mask=mask)
 loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-folder = os.path.join("universal_MRI", "universal")
+folder = os.path.join("universal_MRI", "universal", f"{mask}_{acc}")
 
 if not os.path.exists(folder):
     os.makedirs(folder)

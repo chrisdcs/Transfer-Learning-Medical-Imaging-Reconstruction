@@ -17,12 +17,12 @@ from skimage.metrics import structural_similarity as ssim
 
 from utils.model import LDA
 
-n_phase = 15
+n_phase = 21
 n_epoch = 50
 
 init_seeds()
-anatomy = 'prostate'
-mask = 'radial'
+anatomy = 'brain'
+mask = 'cartesian'
 model = LDA(n_block=n_phase, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -36,10 +36,8 @@ anatomy_loader = DataLoader(anatomy_dataset, batch_size=batch_size, shuffle=True
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.7)
-if not mask:
-    save_dir = f"universal_LDA/{anatomy}/checkpoints_{acc}_sampling_cartesian"
-else:
-    save_dir = f"universal_LDA/{anatomy}/checkpoints_{acc}_sampling_{mask}"
+
+save_dir = f"universal_LDA/{anatomy}/checkpoints_{acc}_sampling_{mask}_phase_{n_phase}"
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -84,5 +82,11 @@ for PhaseNo in range(3, n_phase+1, 2):
         print(epoch_data)
         
         if epoch_i % 10 == 0:
+            checkpoint = {
+                'epoch': epoch_i,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optim.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+            }
             torch.save(model.state_dict(), os.path.join(save_dir, f'checkpoint.pth'))
     scheduler.step()

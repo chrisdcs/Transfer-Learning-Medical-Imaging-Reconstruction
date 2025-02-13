@@ -20,7 +20,7 @@ from utils.model import Universal_LDA, LDA
 n_phase = 15
 n_epoch = 50
 
-mask = 'radial'
+mask = 'cartesian'
 acc = 5
 
 init_seeds()

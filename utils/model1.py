@@ -236,10 +236,12 @@ except ImportError:
     print("Can not import selective_scan_cuda_oflex. This affects speed.", flush=True)
 try:
     import selective_scan_cuda_core
+    print("selective_scan_cuda_core imported", flush=True)
 except ImportError:
     WITH_SELECTIVESCAN_CORE = False
 try:
     import selective_scan_cuda
+    print("selective_scan_cuda imported", flush=True)
 except ImportError:
     WITH_SELECTIVESCAN_MAMBA = False
 
@@ -592,8 +594,9 @@ class Complex_VMamba_Block(torch.nn.Module):
         #         [MambaLayer(n_feats, n_feats, 4, 2)]
                  
         Rconvs = [nn.Conv2d(1, n_feats, kernel_size=k_size, padding=padding),
+                  nn.Conv2d(n_feats, n_feats, kernel_size=k_size, padding=padding),
                   nn.Conv2d(n_feats, n_feats, kernel_size=k_size, padding=padding)] + \
-                 [SS2Dv0()]
+                 [SS2Dv0(16)]
         self.Rconvs = nn.ModuleList(Rconvs)
         
         #Iconvs = [nn.Conv2d(1, n_feats, kernel_size=k_size, padding=padding),
@@ -602,8 +605,9 @@ class Complex_VMamba_Block(torch.nn.Module):
         #         [MambaLayer(n_feats, n_feats, 4, 2)]
         
         Iconvs = [nn.Conv2d(1, n_feats, kernel_size=k_size, padding=padding),
+                  nn.Conv2d(n_feats, n_feats, kernel_size=k_size, padding=padding),
                   nn.Conv2d(n_feats, n_feats, kernel_size=k_size, padding=padding)] + \
-                 [SS2Dv0()]
+                 [SS2Dv0(16)]
                  #[nn.Conv2d(n_feats, n_feats, kernel_size=k_size, padding=padding) for i in range(n_convs-1)]
         self.Iconvs = nn.ModuleList(Iconvs)
         
@@ -614,8 +618,9 @@ class Complex_VMamba_Block(torch.nn.Module):
         #          [MambaLayer(n_feats, n_feats, 4, 2)]
                    
         RconvsT = [nn.ConvTranspose2d(n_feats, 1, kernel_size=k_size, padding=padding),
+                   nn.ConvTranspose2d(n_feats, n_feats, kernel_size=k_size, padding=padding),
                    nn.ConvTranspose2d(n_feats, n_feats, kernel_size=k_size, padding=padding)] + \
-                  [SS2Dv0()]
+                  [SS2Dv0(16)]
                   
         self.RconvsT = nn.ModuleList(RconvsT)
         
@@ -625,8 +630,9 @@ class Complex_VMamba_Block(torch.nn.Module):
         #          [MambaLayer(n_feats, n_feats, 4, 2)]
         
         IconvsT = [nn.ConvTranspose2d(n_feats, 1, kernel_size=k_size, padding=padding),
+                   nn.ConvTranspose2d(n_feats, n_feats, kernel_size=k_size, padding=padding),
                    nn.ConvTranspose2d(n_feats, n_feats, kernel_size=k_size, padding=padding)] + \
-                  [SS2Dv0()]
+                  [SS2Dv0(16)]
                   
         self.IconvsT = nn.ModuleList(IconvsT)
         
@@ -648,8 +654,16 @@ class Complex_VMamba_Block(torch.nn.Module):
             tmp_real, tmp_imag = self.act_der(forward_cache[i-1].clone().real), self.act_der(forward_cache[i-1].clone().imag)
             #out_real_next = F.conv_transpose2d(out_real, self.Rconvs[i].weight, padding=self.padding) - F.conv_transpose2d(out_imag, self.Iconvs[i].weight, padding=self.padding)
             #out_img_next = F.conv_transpose2d(out_real, self.Iconvs[i].weight, padding=self.padding) + F.conv_transpose2d(out_imag, self.Rconvs[i].weight, padding=self.padding)
+            
+            if i == len(forward_cache) - 1:
+                out_real = out_real.permute(0, 2, 3, 1).contiguous()
+                out_imag = out_imag.permute(0, 2, 3, 1).contiguous()
             out_real_next = self.RconvsT[i](out_real) - self.IconvsT[i](out_imag)
             out_img_next = self.IconvsT[i](out_real) + self.RconvsT[i](out_imag)
+            
+            if i == len(forward_cache) - 1:
+                out_real_next = out_real_next.permute(0, 3, 1, 2).contiguous()
+                out_img_next = out_img_next.permute(0, 3, 1, 2).contiguous()
             #out = out_real_next + 1j * out_img_next
             out = out_real_next * tmp_real - out_img_next * tmp_imag + 1j * (out_real_next * tmp_imag + out_img_next * tmp_real)
         out_real, out_imag = out.real, out.imag
@@ -671,6 +685,13 @@ class Complex_VMamba_Block(torch.nn.Module):
             if i == 0:
                 x_real_next = Rconv(x_real) - Iconv(x_imag)
                 x_imag_next = Rconv(x_imag) + Iconv(x_real)
+            elif i == len(self.Rconvs) - 1:
+                x_real = x_real.permute(0, 2, 3, 1).contiguous()
+                x_imag = x_imag.permute(0, 2, 3, 1).contiguous()
+                x_real_next = Rconv(self.act(x_real.clone()))
+                x_imag_next = Iconv(self.act(x_imag.clone()))
+                x_real_next = x_real_next.permute(0, 3, 1, 2).contiguous()
+                x_imag_next = x_imag_next.permute(0, 3, 1, 2).contiguous()
             else:
                 # x_real, x_imag = self.act(x_real), self.act(x_imag)
                 x_real_next = Rconv(self.act(x_real.clone())) - Iconv(self.act(x_imag.clone()))
@@ -698,12 +719,12 @@ class VMamba_LDA(nn.Module):
         channel_num = kwargs['channel_num']
         self.channel_num = channel_num
         
-        self.ImgNet = Complex_VMamba_Block(
+        self.ImgNet = nn.ModuleList([Complex_VMamba_Block(
             n_feats=channel_num,
             n_convs=4,
             k_size=3,
             padding=1,
-        )
+        )] * kwargs['n_block'])
     
     def set_PhaseNo(self, cur_iter):
         self.cur_iter = cur_iter
@@ -726,8 +747,8 @@ class VMamba_LDA(nn.Module):
 
         #c = x - alpha * grad_fx
         c = x - alpha * grad
-        cache_x = self.ImgNet(c)
-        u = c - beta * self.ImgNet.gradient(cache_x, gamma)
+        cache_x = self.ImgNet[phase](c)
+        u = c - beta * self.ImgNet[phase].gradient(cache_x, gamma)
         
         Fu = torch.fft.fft2(u, norm="ortho")
         Fu = data_consistency(Fu, k, mask)
