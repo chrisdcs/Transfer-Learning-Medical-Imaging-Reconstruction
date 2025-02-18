@@ -127,9 +127,9 @@ class PIGANGenerator(nn.Module):
 
         # Final layer
         x = self.final_conv(x) + skip_connections[0]
-        # Fx = torch.fft.fft2(x, norm='ortho')
-        # Fx = data_consistency(Fx, k, mask)
-        # x = torch.fft.ifft2(Fx, norm="ortho")
+        Fx = torch.fft.fft2(x, norm='ortho')
+        Fx = data_consistency(Fx, k, mask)
+        x = torch.fft.ifft2(Fx, norm="ortho")
         return x 
 
 
@@ -195,4 +195,4 @@ def discriminator_loss(real_output, fake_output):
     #d_loss_pos = criterion(real_output, torch.ones_like(real_output))
     #d_loss_neg = criterion(fake_output, torch.zeros_like(fake_output))
     
-    return torch.mean(real_output-fake_output)
+    return torch.mean(fake_output-real_output)
