@@ -34,8 +34,8 @@ loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 
 # Define Optimizers
-optimizer_G = optim.Adam(generator.parameters(), lr=1e-4, betas=(0.5, 0.999))
-optimizer_D = optim.Adam(discriminator.parameters(), lr=1e-4, betas=(0.5, 0.999))
+optimizer_G = optim.Adam(generator.parameters(), lr=2e-4, betas=(0.5, 0.999))
+optimizer_D = optim.Adam(discriminator.parameters(), lr=2e-4, betas=(0.5, 0.999))
 
 scheduler_G = optim.lr_scheduler.StepLR(optimizer_G, step_size=1, gamma=0.99)
 scheduler_D = optim.lr_scheduler.StepLR(optimizer_D, step_size=1, gamma=0.99)
@@ -43,7 +43,7 @@ scheduler_D = optim.lr_scheduler.StepLR(optimizer_D, step_size=1, gamma=0.99)
 save_dir = f"GAN/universal/checkpoints_{acc}_sampling_{mask}"
 
 start_epoch = 1
-n_epoch = 200
+n_epoch = 300
 
 if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
     checkpoint = torch.load(os.path.join(save_dir, 'checkpoint.pth'))
@@ -61,6 +61,9 @@ if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
+real_labels = torch.ones(batch_size, 1, 1, 1).to(device) * 0.9  # Labels for real images
+fake_labels = torch.zeros(batch_size, 1, 1, 1).to(device) + 0.1  # Labels for fake images
+
 for epoch_i in range(start_epoch, n_epoch+1):
     loss_list = []
     PSNR_list = []
@@ -75,13 +78,27 @@ for epoch_i in range(start_epoch, n_epoch+1):
         img_gnd = img_gnd.to(device)
         k_gnd = k_gnd.to(device)
         
+        # train generator
+        for _ in range(2):
+            generator.zero_grad()
+            fake_images = generator(im_und)
+            fake_output = discriminator(fake_images).squeeze()
+            
+            adv_loss = adversarial_loss(fake_output)
+            recon_loss = MAE_Loss(fake_images, img_gnd)
+            fake_k_space = torch.fft.fft2(fake_images, norm='ortho')
+            M_loss = MAE_Loss(fake_k_space * mask, k_gnd * mask)
+            M_inv_loss = MAE_Loss(fake_k_space * (1-mask), k_gnd * (1-mask))
+            
+            generator_loss = adv_loss + recon_loss + 10 * M_loss + 10 * M_inv_loss
+            generator_loss.backward()
+            optimizer_G.step()
         
-        fake_images = generator(im_und)
+        loss_list.append(generator_loss.item())
+        
         
         # train discriminator
         discriminator.zero_grad()
-        real_labels = torch.ones(batch_size, 1, 1, 1).to(device)  # Labels for real images
-        fake_labels = torch.zeros(batch_size, 1, 1, 1).to(device)  # Labels for fake images
         
         # real image loss
         real_output = discriminator(img_gnd)#.squeeze()
@@ -97,28 +114,7 @@ for epoch_i in range(start_epoch, n_epoch+1):
         d_loss.backward()
         optimizer_D.step()
         
-        if (d_loss > 1e12).any():
-            print("Fake output min/max:", fake_output.min(), fake_output.max())
-            #print("Real labels min/max:", real_labels.min(), real_labels.max())
-            print("Fake output contains NaN:", torch.isnan(fake_output).any())
-            #print("Real labels contains NaN:", torch.isnan(real_labels).any())
-        
-        # train generator
-        generator.zero_grad()
-        fake_output = discriminator(fake_images).squeeze()
-        
-        adv_loss = adversarial_loss(fake_output)
-        recon_loss = MAE_Loss(fake_images, img_gnd)
-        fake_k_space = torch.fft.fft2(fake_images, norm='ortho')
-        M_loss = MAE_Loss(fake_k_space * mask, k_gnd * mask)
-        M_inv_loss = MAE_Loss(fake_k_space * (1-mask), k_gnd * (1-mask))
-        
-        generator_loss = adv_loss + recon_loss + 10 * M_loss + 10 * M_inv_loss
-        generator_loss.backward()
-        optimizer_G.step()
-        
-        loss_list.append(generator_loss.item())
-    
+        # PSNR
         for j in range(batch_size):
             PSNR_list.append(psnr(np.abs(fake_images[j].squeeze().cpu().detach().numpy()), 
                                   np.abs(img_gnd[j].squeeze().cpu().detach().numpy()), data_range=1))
