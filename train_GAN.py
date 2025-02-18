@@ -35,7 +35,7 @@ loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # Define Optimizers
 optimizer_G = optim.Adam(generator.parameters(), lr=2e-4, betas=(0.5, 0.999))
-optimizer_D = optim.Adam(discriminator.parameters(), lr=2e-4, betas=(0.5, 0.999))
+optimizer_D = optim.Adam(discriminator.parameters(), lr=1e-4, betas=(0.5, 0.999))
 
 scheduler_G = optim.lr_scheduler.StepLR(optimizer_G, step_size=1, gamma=0.99)
 scheduler_D = optim.lr_scheduler.StepLR(optimizer_D, step_size=1, gamma=0.99)
@@ -61,8 +61,12 @@ if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
-real_labels = torch.ones(batch_size, 1, 1, 1).to(device) * 0.9  # Labels for real images
-fake_labels = torch.zeros(batch_size, 1, 1, 1).to(device) + 0.1  # Labels for fake images
+#real_labels = torch.ones(batch_size, 1, 1, 1).to(device) * 0.9  # Labels for real images
+#fake_labels = torch.zeros(batch_size, 1, 1, 1).to(device) + 0.1  # Labels for fake images
+
+def add_gaussian_noise(x, noise_std=0.01):
+    noise = torch.randn_like(x) * noise_std
+    return x + noise
 
 for epoch_i in range(start_epoch, n_epoch+1):
     loss_list = []
@@ -70,56 +74,43 @@ for epoch_i in range(start_epoch, n_epoch+1):
     for i, data in enumerate(loader):
         # undersampled image, k-space, mask, original image, original k-space
         im_und, k_und, mask, img_gnd, k_gnd, anatomy = data
-        # print(im_und.shape, k_und.shape, mask.shape, img_gnd.shape, k_gnd.shape)
-        
         im_und = im_und.to(device)
         k_und = k_und.to(device)
         mask = mask.to(device)
         img_gnd = img_gnd.to(device)
         k_gnd = k_gnd.to(device)
         
-        # train generator
-        for _ in range(2):
-            generator.zero_grad()
-            fake_images = generator(im_und)
-            fake_output = discriminator(fake_images).squeeze()
-            
-            adv_loss = adversarial_loss(fake_output)
-            recon_loss = MAE_Loss(fake_images, img_gnd)
-            fake_k_space = torch.fft.fft2(fake_images, norm='ortho')
-            M_loss = MAE_Loss(fake_k_space * mask, k_gnd * mask)
-            M_inv_loss = MAE_Loss(fake_k_space * (1-mask), k_gnd * (1-mask))
-            
-            generator_loss = adv_loss + recon_loss + 10 * M_loss + 10 * M_inv_loss
-            generator_loss.backward()
-            optimizer_G.step()
-        
-        loss_list.append(generator_loss.item())
-        
-        
         # train discriminator
         discriminator.zero_grad()
-        
-        # real image loss
-        real_output = discriminator(img_gnd)#.squeeze()
-        #d_loss_real = discriminator_loss(real_output, real_labels)
-        
-        # fake image loss
-        fake_output = discriminator(fake_images.detach())#.squeeze()
-        #d_loss_fake = discriminator_loss(fake_output, fake_labels)
-        
-        
-        # total discriminator loss
-        d_loss = discriminator_loss(real_output, fake_output, real_labels, fake_labels)
+        real_output = discriminator(add_gaussian_noise(img_gnd))
+        fake_images = generator(im_und, k_und, mask).detach()
+        fake_output = discriminator(add_gaussian_noise(fake_images))
+        d_loss = discriminator_loss(real_output, fake_output)
         d_loss.backward()
         optimizer_D.step()
+
+        # train generator
+        #for _ in range(2):
+        generator.zero_grad()
+        fake_images = generator(im_und, k_und, mask)
+        fake_output = discriminator(add_gaussian_noise(fake_images))#.squeeze()
+        adv_loss = adversarial_loss(fake_output)
+        recon_loss = MAE_Loss(fake_images, img_gnd)
+        fake_k_space = torch.fft.fft2(fake_images, norm='ortho')
+        M_loss = MAE_Loss(fake_k_space * mask, k_gnd * mask)
+        M_inv_loss = MAE_Loss(fake_k_space * (1-mask), k_gnd * (1-mask))
+        generator_loss = adv_loss + 10 * recon_loss + 5 * M_loss + 5 * M_inv_loss
+        generator_loss.backward()
+        optimizer_G.step()
+
+        loss_list.append(generator_loss.item())
         
         # PSNR
         for j in range(batch_size):
             PSNR_list.append(psnr(np.abs(fake_images[j].squeeze().cpu().detach().numpy()), 
                                   np.abs(img_gnd[j].squeeze().cpu().detach().numpy()), data_range=1))
-        if (i+1) % 100 == 0:
-            print(i+1, generator_loss.item(), d_loss.item())
+        if (i+1) % 10 == 0:
+            print(i+1, f"adver {adv_loss.item():.3f}, recon {recon_loss.item():.3f}, M {M_loss.item():.3f}, M_inv {M_inv_loss.item():.3f}, discriminator {d_loss.item():.3f}")
     avg_l = np.mean(loss_list)
     avg_p = np.mean(PSNR_list)
     epoch_data = '[Epoch %02d/%02d] Avg Loss: %.4f \t Avg PSNR: %.4f\n\n' % \

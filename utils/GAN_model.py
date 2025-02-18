@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils.model import data_consistency
 #import torch.optim as optim
 
 
@@ -54,7 +55,7 @@ class ResidualBlock(nn.Module):
         self.relu = ComplexReLU()
 
     def forward(self, x):
-        residual = x
+        residual = x.clone()
         out = self.relu(self.conv0(x))
         out = self.relu(self.conv1(out))
         out = self.conv2(out)
@@ -89,8 +90,7 @@ class DecoderBlock(nn.Module):
         x = self.conv2(x)
         
         return x
-    
-    
+
 class PIGANGenerator(nn.Module):
     
     def __init__(self, in_channels=1, out_channels=1, feature_maps=[64, 128, 256, 512]):
@@ -110,7 +110,7 @@ class PIGANGenerator(nn.Module):
         
         self.final_conv = ComplexConv2D(out_fmaps, out_channels, kernel_size=3, stride=1, padding=1)
         
-    def forward(self, x):
+    def forward(self, x, k, mask):
         # Encoder path
         skip_connections = []
         skip_connections.append(x)
@@ -127,7 +127,10 @@ class PIGANGenerator(nn.Module):
 
         # Final layer
         x = self.final_conv(x) + skip_connections[0]
-        return x  # Normalize output to [-1, 1]
+        # Fx = torch.fft.fft2(x, norm='ortho')
+        # Fx = data_consistency(Fx, k, mask)
+        # x = torch.fft.ifft2(Fx, norm="ortho")
+        return x 
 
 
 class ComplexLeakyReLU(nn.Module):
@@ -148,19 +151,19 @@ class PIGANDiscriminator(nn.Module):
     
     def __init__(self, in_channels=1):
         super(PIGANDiscriminator, self).__init__()
-        self.conv1 = ComplexConv2D(in_channels, 32, kernel_size=4, stride=4, padding=0)
+        self.conv1 = ComplexConv2D(in_channels, 64, kernel_size=4, stride=2, padding=0)
         self.leaky_relu = ComplexLeakyReLU()
 
         # Encoder Blocks
         self.encoder_blocks = nn.Sequential(
-            EncoderBlock(32, 64),
+            EncoderBlock(64, 64),
             EncoderBlock(64, 128),
             EncoderBlock(128, 256),
             EncoderBlock(256, 512)
         )
         
         # Output convolution
-        self.conv_final = ComplexConv2D(512, 1, kernel_size=4, stride=4, padding=0)
+        self.conv_final = ComplexConv2D(512, 1, kernel_size=4, stride=1, padding=0)
 
     def forward(self, x):
         # Input convolution
@@ -172,18 +175,24 @@ class PIGANDiscriminator(nn.Module):
 
         # Output convolution
         x = self.conv_final(x)
-        return torch.sigmoid(torch.real(x))  # Output a scalar between 0 and 1
+        return torch.real(x) #torch.sigmoid(torch.real(x))  # Output a scalar between 0 and 1
     
     
 def MAE_Loss(pred, target):
     return torch.mean(torch.abs(pred - target))
 
+#criterion = nn.BCELoss()
+
 def adversarial_loss(fake_output):
-    return -torch.log(fake_output + 1e-10).mean()
+    return -torch.mean(fake_output)
 
 # discriminator_loss
-criterion = nn.BCELoss()
-def discriminator_loss(real_output, fake_output, real_labels, fake_labels):
-    real_loss = criterion(real_output, real_labels)
-    fake_loss = criterion(fake_output, fake_labels)
-    return real_loss + fake_loss
+
+def discriminator_loss(real_output, fake_output):
+    #real_loss = criterion(real_output, real_labels)
+    #fake_loss = criterion(fake_output, fake_labels)
+    #return real_loss + fake_loss
+    #d_loss_pos = criterion(real_output, torch.ones_like(real_output))
+    #d_loss_neg = criterion(fake_output, torch.zeros_like(fake_output))
+    
+    return torch.mean(real_output-fake_output)
