@@ -175,7 +175,7 @@ class PIGANDiscriminator(nn.Module):
 
         # Output convolution
         x = self.conv_final(x)
-        return torch.real(x) #torch.sigmoid(torch.real(x))  # Output a scalar between 0 and 1
+        return torch.sigmoid(torch.real(x))  # Output a scalar between 0 and 1
     
     
 def MAE_Loss(pred, target):
