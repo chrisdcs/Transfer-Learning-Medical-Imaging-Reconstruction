@@ -90,3 +90,47 @@ class universal_data(Dataset):
         im_und, k_und = cs.undersample(image, mask, centred=True)
         
         return im_und.astype(np.complex64), k_und.astype(np.complex64), mask.astype(np.float32), image.astype(np.complex64), k_space.astype(np.complex64), self.anatomy_names[idx % self.n_anatomy]
+    
+    
+class universal_sampling_data(Dataset):
+    def __init__(self, file, sampling_rates, mask):
+        self.universal_image = []
+        self.universal_k_space = []
+        
+        self.sampling_rates = []
+        self.n_sampling = len(sampling_rates)
+        
+        self.mask = mask
+        
+        sampling_data = []
+        sampling_data.append(scio.loadmat(file))
+        for rate in sampling_rates:
+            self.sampling_rates.append(rate)
+        
+        #for j in range(self.n_sampling):
+        for i in range(300):
+            image = sampling_data[0]['images'][i]
+            k_space = sampling_data[0]['k_space'][i]
+            
+            self.universal_image.append(image)
+            self.universal_k_space.append(k_space)
+                
+        
+    def __len__(self):
+        return len(self.universal_image) * self.n_sampling
+    
+    
+    def __getitem__(self, idx):
+        sampling_index = idx // 300
+        idx = idx % 300
+        
+        image = self.universal_image[idx][None,:,:]
+        k_space = self.universal_k_space[idx][None,:,:]
+        
+        if self.mask == 'radial':
+            mask = cs.radial_mask(image.shape, acc=self.sampling_rates[sampling_index], centred=True)
+        else:
+            mask = cs.cartesian_mask(image.shape, acc=self.sampling_rates[sampling_index], centred=True)
+        im_und, k_und = cs.undersample(image, mask, centred=True)
+        
+        return im_und.astype(np.complex64), k_und.astype(np.complex64), mask.astype(np.float32), image.astype(np.complex64), k_space.astype(np.complex64), self.sampling_rates[sampling_index]
