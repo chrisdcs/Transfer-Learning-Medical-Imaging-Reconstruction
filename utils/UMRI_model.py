@@ -90,7 +90,7 @@ def conv_block(n_ch, nd, nf=16, ks=3, dilation=1, bn=False, nl='lrelu', n_out=No
 
     layers += [conv_n]
 
-    return nn.Sequential(*layers)
+    return nn.ModuleList(layers)
 
 class DnCn(nn.Module):
     def __init__(self, n_channels=1, nc=5, nd=5, **kwargs):
@@ -110,21 +110,30 @@ class DnCn(nn.Module):
         self.conv_blocks = nn.ModuleList(conv_blocks)
         #self.dcs = dcs
 
-    def forward(self, x, k, m):
+    def forward(self, x, k, m, MD=False):
+        if MD:
+            feats = []
         for i in range(self.nc):
             
             #real = self.r_conv_blocks[i](x.real) - self.i_conv_blocks[i](x.imag)
             #imag = self.r_conv_blocks[i](x.imag) + self.i_conv_blocks[i](x.real)
             #x_cnn = torch.complex(real, imag)
-            x_cnn = self.conv_blocks[i](x)
+            x_cnn = x.clone()
+            for j in range(2 * self.nd-1):
+                x_cnn = self.conv_blocks[i][j](x_cnn)
+                if MD and j == 5:
+                    feats.append(x_cnn)
+            # x_cnn = self.conv_blocks[i](x)
             x = x + x_cnn
             # x = self.dcs[i].perform(x, k, m)
             
             new_k = torch.fft.fft2(x, norm="ortho")
             new_k = data_consistency(new_k, k, m)
             x = torch.fft.ifft2(new_k, norm="ortho")
-
-        return x
+        if MD:
+            return x, feats
+        else:
+            return x
     
     
 def conv_block_list(n_ch, nd, nf=16, ks=3, dilation=1, bn=False, nl='lrelu', n_out=None):
@@ -211,7 +220,8 @@ class UDnCn(nn.Module):
         assert anatomy not in self.ASPINs
         self.ASPINs[anatomy] = create_ASPIN()
 
-    def forward(self, x, k, m, anatomy):
+    def forward(self, x, k, m, anatomy, MD=False):
+        if MD: feats = []
         for i in range(self.nc):
             
             #real = self.r_conv_blocks[i](x.real) - self.i_conv_blocks[i](x.imag)
@@ -220,6 +230,8 @@ class UDnCn(nn.Module):
             x_cnn = x.clone()
             for j in range(2 * self.nd-1):
                 x_cnn = self.conv_blocks[i][j](x_cnn)
+                if MD and j == 5:
+                    feats.append(x_cnn)
                 if j % 2 == 0 and j < 8:
                     x_cnn = self.ASPINs[anatomy][i][j//2](x_cnn)
             
@@ -231,4 +243,7 @@ class UDnCn(nn.Module):
             new_k = data_consistency(new_k, k, m)
             x = torch.fft.ifft2(new_k, norm="ortho")
 
-        return x
+        if feats:
+            return x, feats
+        else:
+            return x
