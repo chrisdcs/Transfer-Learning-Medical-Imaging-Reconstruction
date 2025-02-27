@@ -17,7 +17,7 @@ from skimage.metrics import structural_similarity as ssim
 
 from utils.model import LDA
 
-n_phase = 21
+n_phase = 15
 n_epoch = 50
 
 init_seeds()
@@ -29,15 +29,16 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 2
 model.to(device)
 
-acc = 5
+acc = 3.33
+n = 300
 
-anatomy_dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=acc, n=400, mask=mask)
+anatomy_dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=acc, n=n, mask=mask)
 anatomy_loader = DataLoader(anatomy_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.7)
 
-save_dir = f"universal_LDA/{anatomy}/checkpoints_{acc}_sampling_{mask}_phase_{n_phase}"
+save_dir = f"universal_LDA/{anatomy}/checkpoints_{acc}_sampling_{mask}_phase_{n_phase}_samples_{n}"
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)

@@ -14,19 +14,26 @@ n_epoch = 50
 
 batch_size  = 2
 mask = 'cartesian'
-acc = 5
+acc = 4
+anatomy = 'brain'
+mode = 'sampling' # could be 'sampling' or 'anatomy
 
 model = HUMUSNet()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
-model.load_state_dict(torch.load(
-    f'HUMUS_Net/universal/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'],
-                    strict=False)
+
+if mode == 'anatomy':
+    model.load_state_dict(torch.load(
+        f'HUMUS_Net/universal/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'],
+                        strict=False)
+elif mode == 'sampling':
+    model.load_state_dict(torch.load(
+        f'HUMUS_Net/universal/checkpoints_{anatomy}_cross_sampling_{mask}/checkpoint.pth')['state_dict'])
 
 
 
-anatomy = ['cardiac']
+anatomy = ['brain']
 
 n_samples = 100
 

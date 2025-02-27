@@ -1,18 +1,33 @@
 from utils.UMRI_model import *
 
-anatomies = ['brain', 'knee']
+
+mode = "sampling"
+if mode == "anatomy":
+    anatomies = ['brain', 'knee']
+else:
+    anatomies = ['10', '5', '3']
 model = UDnCn(anatomies).cuda()
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=10, gamma=0.95)
 
 
 acc = 5
-mask = 'radial'
-dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
-                         acc=acc, mask=mask)
+mask = 'cartesian'
+
+
+if mode == "anatomy":
+    dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
+                            acc=acc, mask=mask)
+elif mode == "sampling":
+    anatomy = 'brain'
+    file = f'data/{anatomy}/brain_singlecoil_train.mat' # could be changed to other things like knee etc.
+    dataset = universal_sampling_data(file, [10, 5, 3.33], "cartesian")
 loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-folder = os.path.join("universal_MRI", "universal", f"{mask}_{acc}")
+if mode == "anatomy":
+    folder = os.path.join("universal_MRI", "universal", f"{mask}_{acc}")
+elif mode == "sampling":
+    folder = os.path.join("universal_MRI", "universal", f"{anatomy}_{mask}")
 
 if not os.path.exists(folder):
     os.makedirs(folder)
@@ -35,6 +50,13 @@ for epoch in range(1, n_epochs+1):
         k_gnd = k_gnd.to(device)    
         
         optim.zero_grad()
+        
+        if torch.is_tensor(anatomy[0]):
+            if anatomy[0].item() == 3.33:
+                anatomy = ['3']
+            else:
+                anatomy = [str(anatomy[0].item())]
+        
         output = model(im_und, k_und, mask, anatomy[0])
         output = torch.abs(output).clamp(0, 1)
         

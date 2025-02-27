@@ -885,3 +885,109 @@ class Universal_LDA_vis(nn.Module):
             hg_list.append(hg)
             
         return x_list, g_list, hg_list
+    
+    
+class Meta(nn.Module):
+    
+    def __init__(self, **kwargs):
+        super(Meta, self).__init__()
+        anatomies = kwargs['anatomies']
+        channel_num = kwargs['channel_num']
+        self.channel_num = channel_num
+        # channel_num = 32
+        self.h_dict = nn.ParameterDict(
+            {
+                anatomy: 
+                nn.Parameter(torch.Tensor([1.0, 1.0]), requires_grad=True) 
+                for anatomy in anatomies
+            }
+        )
+        
+        cur_iter = kwargs['n_block']
+        self.n_block = cur_iter
+        self.cur_iter = cur_iter
+        
+        # self.thresh = nn.Parameter(torch.Tensor([0.002]), requires_grad=True)
+        self.soft_thr = nn.ParameterDict({
+                            anatomy: nn.Parameter(torch.Tensor([0.002]), requires_grad=True) for anatomy in anatomies
+                        })
+        
+        # self.alphas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
+        # self.betas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
+        
+        self.alphas = nn.ParameterDict({
+                            anatomy: nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True) for anatomy in anatomies
+                        })
+        self.betas = nn.ParameterDict({
+                            anatomy: nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True) for anatomy in anatomies
+                        })
+        
+        # complex learnable blocks are still the same
+        # except the gradient part
+        # customize gradient function under universal LDA
+        self.ImgNet = Complex_Learnable_Block(
+            n_feats=channel_num,
+            n_convs=4,
+            k_size=3,
+            padding=1,
+        )
+        
+    def set_PhaseNo(self, cur_iter):
+        self.cur_iter = cur_iter
+        
+    def add_anatomy(self, name, out_feats=16):
+        self.h_dict[name] = nn.Parameter(torch.Tensor([1.0, 1.0]), requires_grad=True)
+        #.to(next(self.parameters()).device)
+        
+        self.soft_thr[name] = nn.Parameter(torch.Tensor([0.002]), requires_grad=True)#.to(next(self.parameters()).device)
+        self.alphas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True)#.to(next(self.parameters()).device)
+        self.betas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True)#.to(next(self.parameters()).device)
+    
+    def phase(self, x, k, phase, gamma, mask, anatomy, return_g=False):
+        '''
+            computation for each phase
+        '''
+        alpha = torch.abs(self.alphas[anatomy][phase])
+        beta = torch.abs(self.betas[anatomy][phase])
+        
+        # update x
+        #Ax = projection.apply(x, self.options)
+        Fx = torch.fft.fft2(x, norm="ortho")
+        # Fx = data_consistency(Fx, k, mask)
+        residual = Fx - k
+        # residual_S_new = Ax - z
+        # grad_fx = projection_t.apply(residual_S_new, self.options)
+        grad = torch.fft.ifft2(residual, norm="ortho")
+
+        #c = x - alpha * grad_fx
+        c = x - alpha * grad
+        cache_x = self.ImgNet(c)
+        
+        grad_R = self.ImgNet.gradient(cache_x, gamma)
+        sig = F.sigmoid(self.h_dict[anatomy])
+        sig_times_grad = torch.complex(sig[0] * grad_R.real - sig[1] * grad_R.imag, 
+                                       sig[1] * grad_R.real + sig[0] * grad_R.imag)
+        
+        u = c - beta * sig_times_grad
+        
+        Fu = torch.fft.fft2(u, norm="ortho")
+        Fu = data_consistency(Fu, k, mask)
+        u = torch.fft.ifft2(Fu, norm="ortho")
+        
+        if return_g:
+            return u, cache_x[-1]
+        return u
+    
+    def forward(self, x, k, mask, anatomy, return_g=None):
+        x_list = []
+        g_list = []
+        for phase in range(self.cur_iter):
+            if return_g:
+                x, hg = self.phase(x, k, phase, 0.9**phase, mask, anatomy, return_g)
+                g_list.append(hg)
+            else:
+                x = self.phase(x, k, phase, 0.9**phase, mask, anatomy)
+            x_list.append(x)
+        if return_g:
+            return x_list, g_list
+        return x_list

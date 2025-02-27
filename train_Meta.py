@@ -17,110 +17,7 @@ from utils.dataset import *
 from utils.general import init_seeds
 
 
-class Meta(nn.Module):
-    
-    def __init__(self, **kwargs):
-        super(Meta, self).__init__()
-        anatomies = kwargs['anatomies']
-        channel_num = kwargs['channel_num']
-        self.channel_num = channel_num
-        # channel_num = 32
-        self.h_dict = nn.ParameterDict(
-            {
-                anatomy: 
-                nn.Parameter(torch.Tensor([1.0, 1.0]), requires_grad=True) 
-                for anatomy in anatomies
-            }
-        )
-        
-        cur_iter = kwargs['n_block']
-        self.n_block = cur_iter
-        self.cur_iter = cur_iter
-        
-        # self.thresh = nn.Parameter(torch.Tensor([0.002]), requires_grad=True)
-        self.soft_thr = nn.ParameterDict({
-                            anatomy: nn.Parameter(torch.Tensor([0.002]), requires_grad=True) for anatomy in anatomies
-                        })
-        
-        # self.alphas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
-        # self.betas = nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True)
-        
-        self.alphas = nn.ParameterDict({
-                            anatomy: nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True) for anatomy in anatomies
-                        })
-        self.betas = nn.ParameterDict({
-                            anatomy: nn.Parameter(torch.tensor([1e-12] * kwargs['n_block']), requires_grad=True) for anatomy in anatomies
-                        })
-        
-        # complex learnable blocks are still the same
-        # except the gradient part
-        # customize gradient function under universal LDA
-        self.ImgNet = Complex_Learnable_Block(
-            n_feats=channel_num,
-            n_convs=4,
-            k_size=3,
-            padding=1,
-        )
-        
-    def set_PhaseNo(self, cur_iter):
-        self.cur_iter = cur_iter
-        
-    def add_anatomy(self, name, out_feats=16):
-        self.h_dict[name] = nn.Parameter(torch.Tensor([1.0, 1.0]), requires_grad=True)
-        #.to(next(self.parameters()).device)
-        
-        self.soft_thr[name] = nn.Parameter(torch.Tensor([0.002]), requires_grad=True)#.to(next(self.parameters()).device)
-        self.alphas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True)#.to(next(self.parameters()).device)
-        self.betas[name] = nn.Parameter(torch.tensor([1e-12] * self.n_block), requires_grad=True)#.to(next(self.parameters()).device)
-    
-    def phase(self, x, k, phase, gamma, mask, anatomy, return_g=False):
-        '''
-            computation for each phase
-        '''
-        alpha = torch.abs(self.alphas[anatomy][phase])
-        beta = torch.abs(self.betas[anatomy][phase])
-        
-        # update x
-        #Ax = projection.apply(x, self.options)
-        Fx = torch.fft.fft2(x, norm="ortho")
-        # Fx = data_consistency(Fx, k, mask)
-        residual = Fx - k
-        # residual_S_new = Ax - z
-        # grad_fx = projection_t.apply(residual_S_new, self.options)
-        grad = torch.fft.ifft2(residual, norm="ortho")
 
-        #c = x - alpha * grad_fx
-        c = x - alpha * grad
-        cache_x = self.ImgNet(c)
-        
-        grad_R = self.ImgNet.gradient(cache_x, gamma)
-        sig = F.sigmoid(self.h_dict[anatomy])
-        sig_times_grad = torch.complex(sig[0] * grad_R.real - sig[1] * grad_R.imag, 
-                                       sig[1] * grad_R.real + sig[0] * grad_R.imag)
-        
-        u = c - beta * sig_times_grad
-        
-        Fu = torch.fft.fft2(u, norm="ortho")
-        Fu = data_consistency(Fu, k, mask)
-        u = torch.fft.ifft2(Fu, norm="ortho")
-        
-        if return_g:
-            return u, cache_x[-1]
-        return u
-    
-    def forward(self, x, k, mask, anatomy, return_g=None):
-        x_list = []
-        g_list = []
-        for phase in range(self.cur_iter):
-            if return_g:
-                x, hg = self.phase(x, k, phase, 0.9**phase, mask, anatomy, return_g)
-                g_list.append(hg)
-            else:
-                x = self.phase(x, k, phase, 0.9**phase, mask, anatomy)
-            x_list.append(x)
-        if return_g:
-            return x_list, g_list
-        return x_list
 
 if os.path.exists('./data/brain/Meta_brain_singlecoil_train.mat'):
     print('Meta brain singlecoil dataset exists!')
@@ -167,41 +64,39 @@ else:
     scio.savemat('./data/knee/Meta_knee_singlecoil_val.mat', val_data_knee)
 
 init_seeds()
-anatomies = ['brain', 'knee']#, 'cardiac']
+
 n_phase = 15
-model = Meta(
-    anatomies=anatomies,
-    channel_num=16,
-    n_block=n_phase
-)
-
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 1
-model.to(device)
-
-
 mask = "cartesian"
-
 acc = 5
+mode = "sampling"
 
-train_dataset = universal_data(['data/brain/Meta_brain_singlecoil_train.mat', 
-                          'data/knee/Meta_knee_singlecoil_train.mat'], 
-                         # 'data/cardiac/cardiac_singlecoil_train.mat'], 
-                         acc=acc, mask=mask)
+if mode == "anatomy":
+    anatomies = ['brain', 'knee']
+    train_dataset = universal_data(['data/brain/Meta_brain_singlecoil_train.mat', 
+                            'data/knee/Meta_knee_singlecoil_train.mat'], 
+                            # 'data/cardiac/cardiac_singlecoil_train.mat'], 
+                            acc=acc, mask=mask)
+    val_dataset = universal_data(['data/brain/Meta_brain_singlecoil_val.mat',
+                                'data/knee/Meta_knee_singlecoil_val.mat'], 
+                                # 'data/cardiac/cardiac_singlecoil_val.mat'], 
+                                acc=acc, mask=mask)
+    save_dir = f"Meta/universal/{mask}_{acc}"
+elif mode == "sampling":
+    anatomies = ['10', '5', '3']
+    anatomy = 'brain'
+    train_file = f'data/{anatomy}/Meta_brain_singlecoil_train.mat'
+    val_file = f'data/{anatomy}/Meta_brain_singlecoil_val.mat'
+    train_dataset = universal_sampling_data(train_file, [10, 5, 3.33], mask)
+    val_dataset = universal_sampling_data(val_file, [10, 5, 3.33], mask)
+    save_dir = f"Meta/universal/{anatomy}_cross_sampling_{mask}"
+
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
-val_dataset = universal_data(['data/brain/Meta_brain_singlecoil_val.mat',
-                            'data/knee/Meta_knee_singlecoil_val.mat'], 
-                             # 'data/cardiac/cardiac_singlecoil_val.mat'], 
-                             acc=acc, mask=mask)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 val_iter = iter(val_loader)
-# optimizer
-net_optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-anatomies = ['brain', 'knee']
 
 model = Meta(
     anatomies=anatomies,
@@ -214,8 +109,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
 # Separate parameters by name
-mask = "radial"
-acc = 5
 h_dict_params = []
 main_params = []
 for name, param in model.named_parameters():
@@ -230,7 +123,7 @@ w_optim = torch.optim.Adam(h_dict_params, lr=1e-4)
 
 scheduler_net = torch.optim.lr_scheduler.StepLR(net_optim, step_size=10, gamma=0.5)
 scheduler_w = torch.optim.lr_scheduler.StepLR(w_optim, step_size=10, gamma=0.7)
-save_dir = f"Meta/universal/{mask}_{acc}"
+
 
 start_epoch = 1
 start_phase = 3
@@ -278,6 +171,13 @@ for PhaseNo in range(start_phase, n_phase+1, 2):
             # forward pass
             for _ in range(3):
                 net_optim.zero_grad()
+                
+                if torch.is_tensor(anatomy[0]):
+                    if anatomy[0].item() == 3.33:
+                        anatomy = ['3']
+                    else:
+                        anatomy = [str(anatomy[0].item())]
+                
                 output = model(im_und, k_und, mask, anatomy[0])
                 output = torch.abs(output[-1]).clamp(0, 1)
                 img_gnd = torch.abs(img_gnd)
@@ -303,6 +203,11 @@ for PhaseNo in range(start_phase, n_phase+1, 2):
             k_gnd = k_gnd.to(device)
             
             w_optim.zero_grad()
+            if torch.is_tensor(anatomy[0]):
+                if anatomy[0].item() == 3.33:
+                    anatomy = ['3']
+                else:
+                    anatomy = [str(anatomy[0].item())]
             output = model(im_und, k_und, mask, anatomy[0])
             output = torch.abs(output[-1]).clamp(0, 1)
             img_gnd = torch.abs(img_gnd)

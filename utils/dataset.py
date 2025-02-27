@@ -104,11 +104,14 @@ class universal_sampling_data(Dataset):
         
         sampling_data = []
         sampling_data.append(scio.loadmat(file))
+        n = len(sampling_data[0]['images'])
+        n = min(300, n)
+        self.n = n
         for rate in sampling_rates:
             self.sampling_rates.append(rate)
         
         #for j in range(self.n_sampling):
-        for i in range(300):
+        for i in range(self.n):
             image = sampling_data[0]['images'][i]
             k_space = sampling_data[0]['k_space'][i]
             
@@ -121,8 +124,8 @@ class universal_sampling_data(Dataset):
     
     
     def __getitem__(self, idx):
-        sampling_index = idx // 300
-        idx = idx % 300
+        sampling_index = idx // self.n
+        idx = idx % self.n
         
         image = self.universal_image[idx][None,:,:]
         k_space = self.universal_k_space[idx][None,:,:]
