@@ -243,7 +243,7 @@ class UDnCn(nn.Module):
             new_k = data_consistency(new_k, k, m)
             x = torch.fft.ifft2(new_k, norm="ortho")
 
-        if feats:
+        if MD:
             return x, feats
         else:
             return x
