@@ -53,7 +53,7 @@ class init_data(Dataset):
     
     
 class universal_data(Dataset):
-    def __init__(self, files, acc, mask=None):
+    def __init__(self, files, acc, mask=None, n=400):
         # acc: acceleration rate
         self.universal_image = []
         self.universal_k_space = []
@@ -69,7 +69,7 @@ class universal_data(Dataset):
             self.anatomy_names.append(file.split('/')[1])
         
         for j in range(self.n_anatomy):
-            for i in range(min(400,len(anatomies[j]['images']))):
+            for i in range(min(n,len(anatomies[j]['images']))):
                 self.universal_image.append(anatomies[j]['images'][i])
                 self.universal_k_space.append(anatomies[j]['k_space'][i])
         
