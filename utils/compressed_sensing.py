@@ -84,7 +84,7 @@ def radial_mask(shape, acc, sample_n=0, centred=False):
     
     return mask
 
-def cartesian_mask(shape, acc, sample_n=10, centred=False):
+def cartesian_mask(shape, acc, sample_n=10, centred=False, return_idx=False):
     """
     Sampling density estimated from implementation of kt FOCUSS
 
@@ -109,18 +109,18 @@ def cartesian_mask(shape, acc, sample_n=10, centred=False):
     for i in range(N):
         idx = np.random.choice(Nx, n_lines, False, pdf_x)
         mask[i, idx] = 1
-
     if sample_n:
         mask[:, Nx//2-sample_n//2:Nx//2+sample_n//2] = 1
 
     size = mask.itemsize
     mask = as_strided(mask, (N, Nx, Ny), (size * Nx, size, 0))
-
+    
     mask = mask.reshape(shape)
 
     if not centred:
         mask = mymath.ifftshift(mask, axes=(-1, -2))
-
+    if return_idx:
+        return mask, idx
     return mask
 
 

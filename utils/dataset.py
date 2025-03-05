@@ -4,6 +4,37 @@ from torch.utils.data import Dataset
 import numpy as np
 import utils.compressed_sensing as cs
 
+class anatomy_split_data(Dataset):
+    def __init__(self, file, acc, n, mask=None):
+        # acc: acceleration rate
+        self.data = scio.loadmat(file)
+        self.acc = acc
+        self.n = n
+        self.mask = mask
+    
+    def __len__(self):
+        return min(self.n,len(self.data['images']))
+    
+    def __getitem__(self, idx):
+        # return undersampled image, k-space, mask, original image, original k-space
+        image = self.data['images'][idx][None,:,:]
+        k_space = self.data['k_space'][idx][None,:,:]
+        
+        if not self.mask or self.mask == 'cartesian':
+            mask, indices = cs.cartesian_mask(image.shape, acc=self.acc, centred=True, return_idx=True)
+        n = len(indices)
+        mask1 = mask.copy()
+        mask1[0, indices[:n//2], :] = 0
+        mask2 = mask.copy()
+        mask2[0, indices[n//2:], :] = 0
+        im_und, k_und = cs.undersample(image, mask, centred=True)
+        
+        im_und1, k_und1 = cs.undersample(image, mask1, centred=True)
+        im_und2, k_und2 = cs.undersample(image, mask2, centred=True)
+        
+        return im_und.astype(np.complex64), k_und.astype(np.complex64), mask.astype(np.float32), image.astype(np.complex64), k_space.astype(np.complex64), \
+                im_und1.astype(np.complex64), k_und1.astype(np.complex64), mask1.astype(np.float32), \
+                im_und2.astype(np.complex64), k_und2.astype(np.complex64), mask2.astype(np.float32)
 
 class anatomy_data(Dataset):
     def __init__(self, file, acc, n, mask=None):
