@@ -14,36 +14,50 @@ n_epoch = 50
 
 batch_size  = 2
 mask = 'cartesian'
-acc = 4
-anatomy = 'brain'
-mode = 'sampling' # could be 'sampling' or 'anatomy
+mode = 'dataset' # could be 'sampling' or 'anatomy
 
 model = HUMUSNet()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
-
 if mode == 'anatomy':
+    anatomy = 'prostate'
+    acc = 5
+    n_samples = 40
     model.load_state_dict(torch.load(
-        f'HUMUS_Net/universal/checkpoints_{acc}_sampling_{mask}/checkpoint.pth')['state_dict'],
+        f'HUMUS_Net/universal/cross_anatomy/checkpoints_{acc}_{mask}/checkpoint.pth')['state_dict'],
                         strict=False)
 elif mode == 'sampling':
+    anatomy = 'brain'
+    acc = 6.66
+    n_samples = 40
     model.load_state_dict(torch.load(
-        f'HUMUS_Net/universal/checkpoints_{anatomy}_cross_sampling_{mask}/checkpoint.pth')['state_dict'])
+        f'HUMUS_Net/universal/cross_sampling/checkpoints_{anatomy}_{mask}/checkpoint.pth')['state_dict'])
+elif mode == 'dataset':
+    acc = 5
+    n_samples = 40
+    anatomy = 'fastMRI'
+    model.load_state_dict(torch.load(
+        f'HUMUS_Net/universal/cross_dataset/checkpoints_imagenet_{mask}/checkpoint.pth')['state_dict'])
+    # anatomy = "mayo"
 
+# n_samples = 100
 
-
-anatomy = ['brain']
-
-n_samples = 100
-
-transfer_dataset = anatomy_data(f'data/{anatomy[0]}/{anatomy[0]}_singlecoil_train.mat', acc=acc, n=n_samples, mask=mask)
-print(f"number of samples in {anatomy[0]} dataset: ", len(transfer_dataset))
+transfer_dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=acc, n=n_samples, mask=mask)
+print(f"number of samples in {anatomy} dataset: ", len(transfer_dataset))
 transfer_loader = DataLoader(transfer_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-5)
 #scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.5)
-save_dir = f"HUMUS_Net/{anatomy[0]}/checkpoints_transfer_{acc}_sampling_{mask}_samples_{n_samples}"
+
+if mode == "anatomy":
+    save_dir = f"HUMUS_Net/{anatomy}/checkpoints_transfer_{acc}_{mask}_samples_{n_samples}"
+elif mode == "sampling":
+    save_dir = f"HUMUS_Net/{anatomy}/checkpoints_transfer_{acc}_{mask}_samples_{n_samples}"
+elif mode == "dataset":
+    # anatomy = 'fastMRI'
+    save_dir = f"HUMUS_Net/{anatomy}/checkpoints_transfer_{acc}_{mask}_samples_{n_samples}"
+
 if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
     checkpoint = torch.load(os.path.join(save_dir, 'checkpoint.pth'))
     model.load_state_dict(checkpoint['state_dict'])
@@ -84,7 +98,7 @@ for epoch_i in range(start_epoch, n_epoch+1):
         
         loss_list.append(loss.item())
     
-        for j in range(batch_size):
+        for j in range(min(batch_size, output.shape[0])):
             PSNR_list.append(psnr(np.abs(output[j].squeeze().cpu().detach().numpy()), img_gnd[j].squeeze().cpu().detach().numpy(), data_range=1))
         if (i+1) % 100 == 0:
             print(i+1, loss.item())

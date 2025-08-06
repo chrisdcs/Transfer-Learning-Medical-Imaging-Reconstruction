@@ -70,7 +70,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 1
 mask = "cartesian"
 acc = 5
-mode = "sampling"
+mode = "domain"
 
 if mode == "anatomy":
     anatomies = ['brain', 'knee']
@@ -82,7 +82,7 @@ if mode == "anatomy":
                                 'data/knee/Meta_knee_singlecoil_val.mat'], 
                                 # 'data/cardiac/cardiac_singlecoil_val.mat'], 
                                 acc=acc, mask=mask)
-    save_dir = f"Meta/universal/{mask}_{acc}"
+    save_dir = f"Meta/universal/cross_anatomy/checkpoints_{acc}_{mask}"
 elif mode == "sampling":
     anatomies = ['10', '5', '3']
     anatomy = 'brain'
@@ -90,9 +90,18 @@ elif mode == "sampling":
     val_file = f'data/{anatomy}/Meta_brain_singlecoil_val.mat'
     train_dataset = universal_sampling_data(train_file, [10, 5, 3.33], mask)
     val_dataset = universal_sampling_data(val_file, [10, 5, 3.33], mask)
-    save_dir = f"Meta/universal/{anatomy}_cross_sampling_{mask}"
-
-
+    save_dir = f"Meta/universal/cross_sampling/checkpoints_{anatomy}_{mask}"
+elif mode == "dataset":
+    anatomies = ['imagenet']
+    train_dataset = universal_data(['data/imagenet/imagenet_singlecoil_train.mat'], acc=acc, mask = mask, n=800)
+    val_dataset = universal_data(['data/imagenet/imagenet_singlecoil_train.mat'], acc=acc, mask=mask, n=100)
+    save_dir = f"Meta/universal/cross_dataset/imagenet_{mask}_{acc}"
+elif mode == "domain":
+    anatomies = ['imagenet', 'cifar10']
+    files = [f'data/{anatomy}/{anatomy}_singlecoil_train.mat' for anatomy in anatomies]
+    train_dataset = universal_data(files, acc=acc, mask=mask, n=400)
+    val_dataset = universal_data(files, acc=acc, mask=mask, n=100)
+    save_dir = f"Meta/universal/cross_domain/checkpoints_{acc}_{mask}"
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 val_iter = iter(val_loader)

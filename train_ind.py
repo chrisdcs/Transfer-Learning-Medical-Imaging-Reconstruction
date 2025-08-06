@@ -21,7 +21,7 @@ n_phase = 15
 n_epoch = 50
 
 init_seeds()
-anatomy = 'brain'
+anatomy = 'cifar10'
 mask = 'cartesian'
 model = LDA(n_block=n_phase, channel_num=16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -29,16 +29,16 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size = 2
 model.to(device)
 
-acc = 3.33
-n = 300
+acc = 5
+n_samples = 400
 
-anatomy_dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=acc, n=n, mask=mask)
+anatomy_dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=acc, n=n_samples, mask=mask)
 anatomy_loader = DataLoader(anatomy_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=1, gamma=0.7)
 
-save_dir = f"universal_LDA/{anatomy}/checkpoints_{acc}_sampling_{mask}_phase_{n_phase}_samples_{n}"
+save_dir = f"universal_LDA/{anatomy}/checkpoints_{acc}_sampling_{mask}_phase_{n_phase}_samples_{n_samples}"
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -72,7 +72,7 @@ for PhaseNo in range(3, n_phase+1, 2):
             
             loss_list.append(loss.item())
         
-            for j in range(batch_size):
+            for j in range(min(batch_size, output.shape[0])):
                 PSNR_list.append(psnr(np.abs(output[j].squeeze().cpu().detach().numpy()), img_gnd[j].squeeze().cpu().detach().numpy(), data_range=1))
             if (i+1) % 100 == 0:
                 print(i+1, loss.item())

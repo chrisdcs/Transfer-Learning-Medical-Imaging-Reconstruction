@@ -14,28 +14,43 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 batch_size = 1
 model.to(device)
-mode = "sampling" # could be changed to "anatomy" for cross-anatomy transfer learning
+mode = "dataset" # could be changed to "anatomy" for cross-anatomy transfer learning
 
 mask = 'cartesian'
-acc = 4
+
 if mode == "anatomy":
-    dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
-                            # 'data/cardiac/cardiac_singlecoil_train.mat'], 
-                            acc=acc, mask=mask)
+    anatomy = "prostate"
+    n_samples = 5
+    acc = 5
+    #dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 
+    #                          'data/knee/knee_singlecoil_train.mat'], 
+    #                        acc=acc, mask=mask)
+    dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', 
+                           acc=acc, n=n_samples, mask=mask)
+    model.load_state_dict(torch.load(f'UNet/universal/cross_anatomy/checkpoints_{acc}_{mask}/checkpoint.pth')['state_dict'])
 elif mode == "sampling":
     anatomy = 'brain'
     file = f'data/{anatomy}/brain_singlecoil_train.mat'
+    acc = 6.66
+    n_samples = 40
     # file = f'data/{anatomy}/knee_singlecoil_train.mat' # could be changed to other things like knee etc.
-    dataset = anatomy_data(file, acc=acc, n=100, mask=mask)
+    dataset = anatomy_data(file, acc=acc, n=n_samples, mask=mask)
     
-    model.load_state_dict(torch.load(f'UNet/universal/checkpoints_{anatomy}_{mask}/checkpoint.pth')['state_dict'])
+    model.load_state_dict(torch.load(f'UNet/universal/cross_sampling/checkpoints_{anatomy}_{mask}/checkpoint.pth')['state_dict'])
+elif mode == "dataset":
+    anatomy = 'fastMRI'
+    acc = 5
+    n_samples = 40
+    file = f'data/{anatomy}/{anatomy}_singlecoil_train.mat'
+    dataset = anatomy_data(file, acc=acc, n=n_samples, mask=mask)
+    model.load_state_dict(torch.load(f'UNet/universal/cross_dataset/checkpoints_imagenet_{mask}/checkpoint.pth')['state_dict'])
 loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 #brain_dataset = anatomy_data('data/brain/brain_singlecoil_train.mat', acc=5)
 #brain_loader = DataLoader(brain_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-5)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=10, gamma=0.9)
-save_dir = f"UNet/{anatomy}/checkpoints_transfer_{acc}_sampling_{mask}_samples_100"
+save_dir = f"UNet/{anatomy}/checkpoints_transfer_{acc}_sampling_{mask}_samples_{n_samples}"
 
 start_epoch = 1
 

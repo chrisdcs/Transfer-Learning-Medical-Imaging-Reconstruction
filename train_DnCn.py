@@ -3,16 +3,19 @@ from utils.UMRI_model import *
 
 mode = "domain"
 if mode == "anatomy":
-    anatomies = ['brain', 'knee']
+    anatomy = 'prostate'
+    n = 40
 elif mode == "sampling":
-    anatomies = ['10', '5', '3']
+    anatomy = '10'
+    n = 100
 elif mode == "dataset":
-    # anatomies = ['imagenet']
-    anatomies = ['imagenet', 'cifar10']
+    anatomy = 'stanford'
+    n = 100
 elif mode == "domain":
-    anatomies = ['imagenet', 'cifar10']
+    anatomy = 'cifar10'
+    n = 400
 
-model = UDnCn(anatomies).cuda()
+model = DnCn().cuda()
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=10, gamma=0.95)
 
@@ -21,41 +24,41 @@ acc = 5
 mask = 'cartesian'
 
 
+
 if mode == "anatomy":
-    dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
+    #dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'], 
                             # 'data/cardiac/cardiac_singlecoil_train.mat'], 
-                            acc=acc, mask=mask)
+    #                        acc=acc, mask=mask)
+    dataset = anatomy_data(f'data/{anatomy}/{anatomy}_singlecoil_train.mat', acc=acc, mask = mask, n=n)
 elif mode == "sampling":
-    anatomy = 'brain'
+    #anatomy = 'brain'
     file = f'data/{anatomy}/brain_singlecoil_train.mat'
     # file = f'data/{anatomy}/knee_singlecoil_train.mat' # could be changed to other things like knee etc.
     dataset = universal_sampling_data(file, [10, 5, 3.33], "cartesian")
 elif mode == "dataset":
     # this is for cross-dataset transfer learning
-    anatomy = 'imagenet'
-    #file = f'data/{anatomy}/{anatomy}_singlecoil_train.mat' # could be changed to other things like knee etc.
-    files = [f'data/{anatomy}/{anatomy}_singlecoil_train.mat' for anatomy in anatomies]
-    dataset = universal_data(files, acc=acc, mask = "cartesian", n=400)
+    #anatomy = 'imagenet'
+    file = f'data/{anatomy}/{anatomy}_singlecoil_train.mat' # could be changed to other things like knee etc.
+    dataset = anatomy_data(file, acc=acc, mask = "cartesian", n=n)
 elif mode == "domain":
-    #file = f'data/{anatomy}/{anatomy}_singlecoil_train.mat' # could be changed to other things like knee etc.
-    files = [f'data/{anatomy}/{anatomy}_singlecoil_train.mat' for anatomy in anatomies]
-    dataset = universal_data(files, acc=acc, mask=mask, n=400)
+    file = f'data/{anatomy}/{anatomy}_singlecoil_train.mat' # could be changed to other things like knee etc.
+    dataset = anatomy_data(file, acc=acc, mask=mask, n=n)
 loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 if mode == "anatomy":
-    save_dir = f"universal_MRI/universal/cross_anatomy/checkpoints_{acc}_{mask}"
+    save_dir = f"universal_MRI/{anatomy}/cross_anatomy/checkpoints_{acc}_{mask}_samples_{n}"
 elif mode == "sampling":
-    save_dir = f"universal_MRI/universal/cross_sampling/checkpoints_{anatomy}_{mask}"
+    save_dir = f"universal_MRI/{anatomy}/cross_sampling/checkpoints_{anatomy}_{mask}_samples_{n}"
 elif mode == "dataset":
-    save_dir = f"universal_MRI/universal/cross_dataset/checkpoints_{anatomy}_{mask}"
+    save_dir = f"universal_MRI/{anatomy}/cross_dataset/checkpoints_{anatomy}_{mask}_samples_{n}"
 elif mode == "domain":
-    save_dir = f"universal_MRI/universal/cross_domain/checkpoints_{acc}_{mask}"
+    save_dir = f"universal_MRI/{anatomy}/cross_domain/checkpoints_{anatomy}_{mask}_samples_{n}"
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
 
-n_epochs = 200
+n_epochs = 100
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 for epoch in range(1, n_epochs+1):
     PSNR_list = []
@@ -63,7 +66,7 @@ for epoch in range(1, n_epochs+1):
     
     for i, data in enumerate(loader):
         
-        im_und, k_und, mask, img_gnd, k_gnd, anatomy = data
+        im_und, k_und, mask, img_gnd, k_gnd = data
         
         im_und = im_und.to(device)
         k_und = k_und.to(device)
@@ -73,13 +76,7 @@ for epoch in range(1, n_epochs+1):
         
         optim.zero_grad()
         
-        if torch.is_tensor(anatomy[0]):
-            if anatomy[0].item() == 3.33:
-                anatomy = ['3']
-            else:
-                anatomy = [str(anatomy[0].item())]
-        
-        output = model(im_und, k_und, mask, anatomy[0])
+        output = model(im_und, k_und, mask)
         output = torch.abs(output).clamp(0, 1)
         
         img_gnd = torch.abs(img_gnd)

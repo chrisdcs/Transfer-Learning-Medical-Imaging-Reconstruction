@@ -15,7 +15,16 @@ model = HUMUSNet()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
-mode = "sampling" # could be changed to "anatomy" for cross-anatomy transfer learning
+mode = "domain" # could be changed to "anatomy" for cross-anatomy transfer learning
+
+if mode == "anatomy":
+    anatomies = ['brain', 'knee']
+elif mode == "sampling":
+    anatomies = ['10', '5', '3']
+elif mode == "dataset":
+    anatomies = ['imagenet']
+elif mode == "domain":
+    anatomies = ['imagenet', 'cifar10']
 
 batch_size  = 2
 mask = 'cartesian'
@@ -25,22 +34,33 @@ acc = 5
 if mode == "anatomy":
     dataset = universal_data(['data/brain/brain_singlecoil_train.mat', 'data/knee/knee_singlecoil_train.mat'],
                             acc=acc, mask=mask)
-else:
+elif mode == "sampling":
     # This is for cross-sampling transfer learning
     anatomy = 'brain'
     file = f'data/{anatomy}/brain_singlecoil_train.mat' # could be changed to other things like knee etc.
     dataset = universal_sampling_data(file, [10, 5, 3.33], "cartesian")
-
+elif mode == "dataset":
+    # this is for cross-dataset transfer learning
+    anatomy = 'imagenet'
+    file = f'data/{anatomy}/{anatomy}_singlecoil_train.mat' # could be changed to other things like knee etc.
+    #files = [f'data/{anatomy}/{anatomy}_singlecoil_train.mat' for anatomy in anatomies]
+    dataset = universal_data([file], acc=acc, mask=mask, n=800)
+elif mode == "domain":
+    files = [f'data/{anatomy}/{anatomy}_singlecoil_train.mat' for anatomy in anatomies]
+    dataset = universal_data(files, acc=acc, mask=mask, n=400)
 loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=50, gamma=0.5)
 
 if mode == "anatomy":
-    save_dir = f"HUMUS_Net/universal/checkpoints_{acc}_sampling_{mask}"
-else:
-    save_dir = f"HUMUS_Net/universal/checkpoints_{anatomy}_cross_sampling_{mask}"
-
+    save_dir = f"HUMUS_Net/universal/cross_anatomy/checkpoints_{acc}_{mask}"
+elif mode == "sampling":
+    save_dir = f"HUMUS_Net/universal/cross_sampling/checkpoints_{anatomy}_{mask}"
+elif mode == "dataset":
+    save_dir = f"HUMUS_Net/universal/cross_dataset/checkpoints_{anatomy}_{mask}"
+elif mode == "domain":
+    save_dir = f"HUMUS_Net/universal/cross_domain/checkpoints_{acc}_{mask}"
 
 if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
     checkpoint = torch.load(os.path.join(save_dir, 'checkpoint.pth'))

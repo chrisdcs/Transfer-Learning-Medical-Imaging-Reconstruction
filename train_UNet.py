@@ -9,14 +9,20 @@ import numpy as np
 from utils.UNet_model import *
 import os
 
-anatomies = ['brain', 'knee']#, 'cardiac']
-#mask = 'radial'
 model = UNet()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 batch_size = 1
 model.to(device)
-mode = "sampling" # could be changed to "anatomy" for cross-anatomy transfer learning
+mode = "domain" # could be changed to "anatomy" for cross-anatomy transfer learning
+if mode == "anatomy":
+    anatomies = ['brain', 'knee']
+elif mode == "sampling":
+    anatomies = ['10', '5', '3']
+elif mode == "dataset":
+    anatomies = ['imagenet']
+elif mode == "domain":
+    anatomies = ['imagenet', 'cifar10']
 
 mask = 'cartesian'
 acc = 5
@@ -29,14 +35,29 @@ elif mode == "sampling":
     file = f'data/{anatomy}/brain_singlecoil_train.mat'
     # file = f'data/{anatomy}/knee_singlecoil_train.mat' # could be changed to other things like knee etc.
     dataset = universal_sampling_data(file, [10, 5, 3.33], "cartesian")
+elif mode == "dataset":
+    # this is for cross-dataset transfer learning
+    anatomy = 'imagenet'
+    file = f'data/{anatomy}/{anatomy}_singlecoil_train.mat' # could be changed to other things like knee etc.
+    dataset = universal_data([file], acc=acc, mask = "cartesian", n=800)
+elif mode == "domain":
+    files = [f'data/{anatomy}/{anatomy}_singlecoil_train.mat' for anatomy in anatomies]
+    dataset = universal_data(files, acc=acc, mask=mask, n=400)
+
 loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 #brain_dataset = anatomy_data('data/brain/brain_singlecoil_train.mat', acc=5)
 #brain_loader = DataLoader(brain_dataset, batch_size=batch_size, shuffle=True)
 
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=10, gamma=0.9)
-save_dir = f"UNet/universal/checkpoints_{anatomy}_{mask}"
-
+if mode == "anatomy":
+    save_dir = f"UNet/universal/cross_anatomy/checkpoints_{acc}_{mask}"
+elif mode == "sampling":
+    save_dir = f"UNet/universal/cross_sampling/checkpoints_{anatomy}_{mask}"
+elif mode == "dataset":
+    save_dir = f"UNet/universal/cross_dataset/checkpoints_{anatomy}_{mask}"
+elif mode == "domain":
+    save_dir = f"UNet/universal/cross_domain/checkpoints_{acc}_{mask}"
 start_epoch = 1
 
 if os.path.exists(os.path.join(save_dir, 'checkpoint.pth')):
